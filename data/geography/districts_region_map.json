@@ -1,0 +1,1302 @@
+[
+  {
+    "district": "Asunafo North Municipal",
+    "region": "Ahafo",
+    "regionIso": "GH-AF"
+  },
+  {
+    "district": "Asunafo South",
+    "region": "Ahafo",
+    "regionIso": "GH-AF"
+  },
+  {
+    "district": "Asutifi North",
+    "region": "Ahafo",
+    "regionIso": "GH-AF"
+  },
+  {
+    "district": "Asutifi South",
+    "region": "Ahafo",
+    "regionIso": "GH-AF"
+  },
+  {
+    "district": "Tano North Municipal",
+    "region": "Ahafo",
+    "regionIso": "GH-AF"
+  },
+  {
+    "district": "Tano South Municipal",
+    "region": "Ahafo",
+    "regionIso": "GH-AF"
+  },
+  {
+    "district": "Adansi Akrofuom",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Adansi Asokwa",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Adansi North",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Adansi South",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Afigya Kwabre North",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Afigya Kwabre South",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Ahafo Ano North",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Ahafo Ano South East",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Ahafo Ano South West",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Amansie Central",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Amansie South",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Amansie West",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Asante Akim Central Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Asante Akim North",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Asante Akim South",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Asokore Mampong Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Asokwa  Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Atwima Kwanwoma",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Atwima Mponua",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Atwima Nwabiagya North",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Atwima Nwabiagya South",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Bekwai Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Bosome Freho",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Bosomtwe",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Ejisu Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Ejura-sekyedumase",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Juaben Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Kumasi Metropolitan",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Kwabre East",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Kwadaso Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Mampong Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Obuasi East",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Obuasi Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Offinso Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Offinso North",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Oforikrom Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Old Tafo Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Sekyere Afram Plains North",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Sekyere Central",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Sekyere East",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Sekyere Kumawu",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Sekyere South",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Suame Municipal",
+    "region": "Ashanti",
+    "regionIso": "GH-AH"
+  },
+  {
+    "district": "Banda",
+    "region": "Bono",
+    "regionIso": "GH-BO"
+  },
+  {
+    "district": "Berekum East Municipal",
+    "region": "Bono",
+    "regionIso": "GH-BO"
+  },
+  {
+    "district": "Berekum West",
+    "region": "Bono",
+    "regionIso": "GH-BO"
+  },
+  {
+    "district": "Dormaa East",
+    "region": "Bono",
+    "regionIso": "GH-BO"
+  },
+  {
+    "district": "Dormaa Municipal",
+    "region": "Bono",
+    "regionIso": "GH-BO"
+  },
+  {
+    "district": "Dormaa West",
+    "region": "Bono",
+    "regionIso": "GH-BO"
+  },
+  {
+    "district": "Jaman North",
+    "region": "Bono",
+    "regionIso": "GH-BO"
+  },
+  {
+    "district": "Jaman South Municipal",
+    "region": "Bono",
+    "regionIso": "GH-BO"
+  },
+  {
+    "district": "Sunyani Municipal",
+    "region": "Bono",
+    "regionIso": "GH-BO"
+  },
+  {
+    "district": "Sunyani West",
+    "region": "Bono",
+    "regionIso": "GH-BO"
+  },
+  {
+    "district": "Tain",
+    "region": "Bono",
+    "regionIso": "GH-BO"
+  },
+  {
+    "district": "Wenchi Municipal",
+    "region": "Bono",
+    "regionIso": "GH-BO"
+  },
+  {
+    "district": "Atebubu Amantin",
+    "region": "Bono East",
+    "regionIso": "GH-BE"
+  },
+  {
+    "district": "Kintampo North Municipal",
+    "region": "Bono East",
+    "regionIso": "GH-BE"
+  },
+  {
+    "district": "Kintampo South",
+    "region": "Bono East",
+    "regionIso": "GH-BE"
+  },
+  {
+    "district": "Nkoranza North",
+    "region": "Bono East",
+    "regionIso": "GH-BE"
+  },
+  {
+    "district": "Nkoranza South",
+    "region": "Bono East",
+    "regionIso": "GH-BE"
+  },
+  {
+    "district": "Pru East",
+    "region": "Bono East",
+    "regionIso": "GH-BE"
+  },
+  {
+    "district": "Pru West",
+    "region": "Bono East",
+    "regionIso": "GH-BE"
+  },
+  {
+    "district": "Sene East",
+    "region": "Bono East",
+    "regionIso": "GH-BE"
+  },
+  {
+    "district": "Sene West",
+    "region": "Bono East",
+    "regionIso": "GH-BE"
+  },
+  {
+    "district": "Techiman Municipal",
+    "region": "Bono East",
+    "regionIso": "GH-BE"
+  },
+  {
+    "district": "Techiman North",
+    "region": "Bono East",
+    "regionIso": "GH-BE"
+  },
+  {
+    "district": "Abura-asebu-kwamankese",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Agona East",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Agona West Municipal",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Ajumako-enyan-essiam",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Asikuma-odoben-brakwa",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Assin Fosu",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Assin North",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Assin South",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Awutu Senya",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Awutu Senya East",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Cape Coast Metropolitan",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Effutu Municipal",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Ekumfi",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Gomoa Central",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Gomoa East",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Gomoa West",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Komenda-edina-eguafo-abirem Municipal",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Mfantseman Municipal",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Twifo Atti-morkwa",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Twifo Hemang Lower Denkyira",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Upper Denkyira East Municipal",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Upper Denkyira West",
+    "region": "Central",
+    "regionIso": "GH-CP"
+  },
+  {
+    "district": "Abuakwa North",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Abuakwa South",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Achiase",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Akwapem North",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Akwapem South",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Akyem Mansa",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Asene Akroso Manso",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Asuogyaman",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Atiwa East",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Atiwa West",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Ayensuano",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Birim Central Municipal",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Birim North",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Birim South",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Denkyembour",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Fanteakwa North",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Fanteakwa South",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Kwaebibirem",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Kwahu Afram Plains North",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Kwahu Afram Plains South",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Kwahu East",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Kwahu South",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Kwahu West",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Lower Manya",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "New Juaben North Municipal",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "New Juaben South Municipal",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Nsawam Adoagyiri",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Okere",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Suhum Municipal",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Upper Manya",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Upper West Akim",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "West Akim",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Yilo Krobo",
+    "region": "Eastern",
+    "regionIso": "GH-EP"
+  },
+  {
+    "district": "Ablekuma Central Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ablekuma North Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ablekuma West Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Accra Metropolis",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ada East",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ada West",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Adenta Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ashaiman Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ayawaso Central Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ayawaso East Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ayawaso North Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ayawaso West",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ga Central Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ga East",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ga North Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ga South Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ga West Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Korle Klottey Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Kpone Katamanso",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Krowor Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "La Dade-kotopon",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "La-nkwantanang-madina",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ledzokuku Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Ningo/prampram",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Okaikwei North Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Shai Osudoku",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Tema Metropolitan",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Tema West Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Weija Gbawe Municipal",
+    "region": "Greater Accra",
+    "regionIso": "GH-AA"
+  },
+  {
+    "district": "Bunkpurugu Nakpanduri",
+    "region": "North East",
+    "regionIso": "GH-NE"
+  },
+  {
+    "district": "Chereponi",
+    "region": "North East",
+    "regionIso": "GH-NE"
+  },
+  {
+    "district": "East Mamprusi",
+    "region": "North East",
+    "regionIso": "GH-NE"
+  },
+  {
+    "district": "Mamprugu Moagduri",
+    "region": "North East",
+    "regionIso": "GH-NE"
+  },
+  {
+    "district": "West Mamprusi Municipal",
+    "region": "North East",
+    "regionIso": "GH-NE"
+  },
+  {
+    "district": "Yunyoo-nasuan",
+    "region": "North East",
+    "regionIso": "GH-NE"
+  },
+  {
+    "district": "Gushegu",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Karaga",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Kpandai",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Kumbungu",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Mion",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Nanton",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Nanumba North",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Nanumba South",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Saboba",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Sagnerigu",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Savelugu",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Tamale Metropolitan",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Tatale Sanguli",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Tolon",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Yendi Municipal",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Zabzugu",
+    "region": "Northern",
+    "regionIso": "GH-NP"
+  },
+  {
+    "district": "Biakoye",
+    "region": "Oti",
+    "regionIso": "GH-OT"
+  },
+  {
+    "district": "Jasikan",
+    "region": "Oti",
+    "regionIso": "GH-OT"
+  },
+  {
+    "district": "Kadjebi",
+    "region": "Oti",
+    "regionIso": "GH-OT"
+  },
+  {
+    "district": "Krachi East Municipal",
+    "region": "Oti",
+    "regionIso": "GH-OT"
+  },
+  {
+    "district": "Krachi Nchumuru",
+    "region": "Oti",
+    "regionIso": "GH-OT"
+  },
+  {
+    "district": "Krachi West",
+    "region": "Oti",
+    "regionIso": "GH-OT"
+  },
+  {
+    "district": "Nkwanta North",
+    "region": "Oti",
+    "regionIso": "GH-OT"
+  },
+  {
+    "district": "Nkwanta South Municipal",
+    "region": "Oti",
+    "regionIso": "GH-OT"
+  },
+  {
+    "district": "Bole",
+    "region": "Savannah",
+    "regionIso": "GH-SV"
+  },
+  {
+    "district": "Central Gonja",
+    "region": "Savannah",
+    "regionIso": "GH-SV"
+  },
+  {
+    "district": "East Gonja Municipal",
+    "region": "Savannah",
+    "regionIso": "GH-SV"
+  },
+  {
+    "district": "North East Gonja",
+    "region": "Savannah",
+    "regionIso": "GH-SV"
+  },
+  {
+    "district": "North Gonja",
+    "region": "Savannah",
+    "regionIso": "GH-SV"
+  },
+  {
+    "district": "Sawla-tuna-kalba",
+    "region": "Savannah",
+    "regionIso": "GH-SV"
+  },
+  {
+    "district": "West Gonja",
+    "region": "Savannah",
+    "regionIso": "GH-SV"
+  },
+  {
+    "district": "Bawku Municipal",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Bawku West",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Binduri",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Bolga  East",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Bolgatanga Municipal",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Bongo",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Builsa North",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Builsa South",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Garu",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Kasena Nankana East",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Kasena Nankana West",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Nabdam",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Pusiga",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Talensi",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Tempane",
+    "region": "Upper East",
+    "regionIso": "GH-UE"
+  },
+  {
+    "district": "Daffiama Bussie Issa",
+    "region": "Upper West",
+    "regionIso": "GH-UW"
+  },
+  {
+    "district": "Jirapa",
+    "region": "Upper West",
+    "regionIso": "GH-UW"
+  },
+  {
+    "district": "Lambussie-karni",
+    "region": "Upper West",
+    "regionIso": "GH-UW"
+  },
+  {
+    "district": "Lawra",
+    "region": "Upper West",
+    "regionIso": "GH-UW"
+  },
+  {
+    "district": "Nadowli-kaleo",
+    "region": "Upper West",
+    "regionIso": "GH-UW"
+  },
+  {
+    "district": "Nandom",
+    "region": "Upper West",
+    "regionIso": "GH-UW"
+  },
+  {
+    "district": "Sissala East",
+    "region": "Upper West",
+    "regionIso": "GH-UW"
+  },
+  {
+    "district": "Sissala West",
+    "region": "Upper West",
+    "regionIso": "GH-UW"
+  },
+  {
+    "district": "Wa East",
+    "region": "Upper West",
+    "regionIso": "GH-UW"
+  },
+  {
+    "district": "Wa Municipal",
+    "region": "Upper West",
+    "regionIso": "GH-UW"
+  },
+  {
+    "district": "Wa West",
+    "region": "Upper West",
+    "regionIso": "GH-UW"
+  },
+  {
+    "district": "Adaklu",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Afadzato South",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Agotime Ziope",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Akatsi North",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Akatsi South",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Anloga",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Central Tongu",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Ho Municipal",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Ho West",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Hohoe Municipal",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Keta Municipal",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Ketu North",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Ketu South",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Kpando Municipal",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "North Dayi",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "North Tongu",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "South Dayi",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "South Tongu",
+    "region": "Volta",
+    "regionIso": "GH-TV"
+  },
+  {
+    "district": "Ahanta West Municipal",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Effia Kwesimintsim Municipal",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Ellembelle",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Jomoro",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Mpohor",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Nzema East",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Prestea/huni Valley",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Sekondi Takoradi Metropolis",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Shama",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Tarkwa Nsuaem",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Wassa Amenfi Central",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Wassa Amenfi East",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Wassa Amenfi West",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Wassa East",
+    "region": "Western",
+    "regionIso": "GH-WP"
+  },
+  {
+    "district": "Aowin",
+    "region": "Western North",
+    "regionIso": "GH-WN"
+  },
+  {
+    "district": "Bia East",
+    "region": "Western North",
+    "regionIso": "GH-WN"
+  },
+  {
+    "district": "Bia West",
+    "region": "Western North",
+    "regionIso": "GH-WN"
+  },
+  {
+    "district": "Bibiani-anhwiaso-bekwai Municipal",
+    "region": "Western North",
+    "regionIso": "GH-WN"
+  },
+  {
+    "district": "Bodi",
+    "region": "Western North",
+    "regionIso": "GH-WN"
+  },
+  {
+    "district": "Juaboso",
+    "region": "Western North",
+    "regionIso": "GH-WN"
+  },
+  {
+    "district": "Sefwi Akontombra",
+    "region": "Western North",
+    "regionIso": "GH-WN"
+  },
+  {
+    "district": "Sefwi-wiawso",
+    "region": "Western North",
+    "regionIso": "GH-WN"
+  },
+  {
+    "district": "Suaman",
+    "region": "Western North",
+    "regionIso": "GH-WN"
+  }
+]

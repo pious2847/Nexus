@@ -1,11 +1,5 @@
 -- N.E.X.U.S. Database Schema — Neon PostgreSQL
---
--- DEPRECATED as the runtime source of truth (ADR-0003, Phase 0 Step 0.2).
--- This file is NO LONGER executed on boot. It is preserved for reference only.
--- The schema is now applied via versioned migrations:
---   src/db/migrations/0000_baseline.sql  (a frozen copy of this file)
--- Apply with: pnpm --filter nexus-backend db:migrate
--- Future schema changes go in NEW migrations, never by editing this file.
+-- Northern Environmental X-system for Universal Sanitation
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 

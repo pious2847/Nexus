@@ -1,0 +1,130 @@
+[
+  {
+    "name": "Ahafo",
+    "fullName": "Ahafo Region",
+    "iso": "GH-AF",
+    "shapeID": "69750345B39836988306125",
+    "capital": "Goaso",
+    "population2021": 564668
+  },
+  {
+    "name": "Ashanti",
+    "fullName": "Ashanti Region",
+    "iso": "GH-AH",
+    "shapeID": "69750345B3295588325057",
+    "capital": "Kumasi",
+    "population2021": 5440463
+  },
+  {
+    "name": "Bono",
+    "fullName": "Bono Region",
+    "iso": "GH-BO",
+    "shapeID": "69750345B13833050062966",
+    "capital": "Sunyani",
+    "population2021": 1208649
+  },
+  {
+    "name": "Bono East",
+    "fullName": "Bono East Region",
+    "iso": "GH-BE",
+    "shapeID": "69750345B43572680159989",
+    "capital": "Techiman",
+    "population2021": 1203400
+  },
+  {
+    "name": "Central",
+    "fullName": "Central Region",
+    "iso": "GH-CP",
+    "shapeID": "69750345B67040307067067",
+    "capital": "Cape Coast",
+    "population2021": 2859821
+  },
+  {
+    "name": "Eastern",
+    "fullName": "Eastern Region",
+    "iso": "GH-EP",
+    "shapeID": "69750345B54645730941985",
+    "capital": "Koforidua",
+    "population2021": 2925653
+  },
+  {
+    "name": "Greater Accra",
+    "fullName": "Greater Accra Region",
+    "iso": "GH-AA",
+    "shapeID": "69750345B46963341226980",
+    "capital": "Accra",
+    "population2021": 5445692
+  },
+  {
+    "name": "North East",
+    "fullName": "North East Region",
+    "iso": "GH-NE",
+    "shapeID": "69750345B94584643914501",
+    "capital": "Nalerigu",
+    "population2021": 658946
+  },
+  {
+    "name": "Northern",
+    "fullName": "Northern Region",
+    "iso": "GH-NP",
+    "shapeID": "69750345B37738609557703",
+    "capital": "Tamale",
+    "population2021": 2310939
+  },
+  {
+    "name": "Oti",
+    "fullName": "Oti Region",
+    "iso": "GH-OT",
+    "shapeID": "69750345B12045161590865",
+    "capital": "Dambai",
+    "population2021": 747248
+  },
+  {
+    "name": "Savannah",
+    "fullName": "Savannah Region",
+    "iso": "GH-SV",
+    "shapeID": "69750345B26994269439887",
+    "capital": "Damongo",
+    "population2021": 653266
+  },
+  {
+    "name": "Upper East",
+    "fullName": "Upper East Region",
+    "iso": "GH-UE",
+    "shapeID": "69750345B7467317238909",
+    "capital": "Bolgatanga",
+    "population2021": 1301226
+  },
+  {
+    "name": "Upper West",
+    "fullName": "Upper West Region",
+    "iso": "GH-UW",
+    "shapeID": "69750345B48673213774244",
+    "capital": "Wa",
+    "population2021": 901502
+  },
+  {
+    "name": "Volta",
+    "fullName": "Volta Region",
+    "iso": "GH-TV",
+    "shapeID": "69750345B58204744476950",
+    "capital": "Ho",
+    "population2021": 1659040
+  },
+  {
+    "name": "Western",
+    "fullName": "Western Region",
+    "iso": "GH-WP",
+    "shapeID": "69750345B38025690459934",
+    "capital": "Takoradi",
+    "population2021": 2060585
+  },
+  {
+    "name": "Western North",
+    "fullName": "Western North Region",
+    "iso": "GH-WN",
+    "shapeID": "69750345B35244651716901",
+    "capital": "Sefwi Wiawso",
+    "population2021": 880921
+  }
+]

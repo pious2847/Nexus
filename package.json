@@ -1,0 +1,19 @@
+{
+  "name": "nexus",
+  "version": "2.0.0",
+  "private": true,
+  "description": "N.E.X.U.S. — national multi-hazard disaster-intelligence platform for Ghana",
+  "packageManager": "pnpm@11.5.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm --filter @nexus/shared build && pnpm -r --if-present build",
+    "typecheck": "pnpm --filter @nexus/shared build && pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "lint": "pnpm -r --if-present lint",
+    "dev:backend": "pnpm --filter nexus-backend dev",
+    "dev:frontend": "pnpm --filter nexus-frontend dev",
+    "shared:build": "pnpm --filter @nexus/shared build"
+  }
+}

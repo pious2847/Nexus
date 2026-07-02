@@ -1,1 +1,33 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# env & secrets (never commit)
+.env
+.env.*
+!.env.example
+
+# build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# drizzle
+nexus-backend/src/db/migrations/meta/_journal.json.bak
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# tooling
 .claude/
+coverage/

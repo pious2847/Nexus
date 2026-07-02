@@ -1,13 +1,22 @@
 {
   "name": "nexus-backend",
-  "version": "1.0.0",
-  "description": "N.E.X.U.S. — Northern Environmental X-system for Universal Sanitation",
+  "version": "2.0.0",
+  "description": "N.E.X.U.S. — national multi-hazard disaster-intelligence platform (API)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "tsx server.js",
+    "dev": "tsx watch server.js",
     "seed": "node src/utils/seeder.js",
-    "test": "echo \"No tests yet\" && exit 0"
+    "seed:geography": "tsx src/core/geography/seed-geography.ts",
+    "seed:rbac": "tsx src/core/rbac/seed-rbac.ts",
+    "backfill:place-id": "tsx src/modules/sanitation/backfill-place-id.ts",
+    "seed:hazard-types": "tsx src/modules/hazards/seed-hazard-types.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio"
   },
   "keywords": [],
   "author": "",
@@ -15,11 +24,13 @@
   "type": "commonjs",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@nexus/shared": "workspace:*",
     "axios": "^1.16.1",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.10.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.36.4",
     "express": "^5.2.1",
     "express-validator": "^7.3.2",
     "fast-xml-parser": "^5.8.0",
@@ -33,9 +44,20 @@
     "pg": "^8.21.0",
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.3",
-    "uuid": "^14.0.0"
+    "uuid": "^14.0.0",
+    "zod": "^3.24.4"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "@types/supertest": "^6.0.2",
+    "drizzle-kit": "^0.28.1",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
   }
 }

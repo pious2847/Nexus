@@ -1,0 +1,20 @@
+{
+  "name": "@nexus/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared types, Zod schemas, and constants for the N.E.X.U.S. platform",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,13 +1,10 @@
 const express = require('express');
 const ctrl = require('../controllers/newsController');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { query } = require('../config/database');
 
-// Ensure AI columns exist (idempotent)
-query(`ALTER TABLE news_articles ADD COLUMN IF NOT EXISTS ai_sentiment VARCHAR(20) DEFAULT 'neutral'`).catch(() => {});
-query(`ALTER TABLE news_articles ADD COLUMN IF NOT EXISTS ai_districts TEXT[]`).catch(() => {});
-query(`ALTER TABLE news_articles ADD COLUMN IF NOT EXISTS ai_event_type VARCHAR(50)`).catch(() => {});
-query(`ALTER TABLE news_articles ADD COLUMN IF NOT EXISTS ai_processed BOOLEAN DEFAULT false`).catch(() => {});
+// NOTE: The AI columns on news_articles (ai_sentiment, ai_districts, ai_event_type,
+// ai_processed) are defined in the baseline migration (src/db/migrations/0000_baseline.sql).
+// Ad-hoc ALTER-on-import was removed in Phase 0 Step 0.2 — schema is managed by migrations.
 
 const router = express.Router();
 

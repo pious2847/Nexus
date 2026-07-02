@@ -1,0 +1,607 @@
+# N.E.X.U.S. — Master Plan (v2.0: National Scale)
+
+> **Status:** Planning phase. Nothing in this document is built yet. This is the
+> agreed blueprint we will implement in phases.
+>
+> **Last updated:** 2026-07-02
+>
+> **Detailed module specs & foundation docs** (deep dives from detailed-planning rounds):
+> - [specs/01-multi-hazard-ews.md](specs/01-multi-hazard-ews.md) — Module B, the prediction/warning core ✅ specced
+> - [specs/02-life-critical-features.md](specs/02-life-critical-features.md) — Module N, life-safety & resilience ✅ **adopted**
+> - [specs/03-foundation-data-model.md](specs/03-foundation-data-model.md) — core schema (geography, identity, RBAC, auth, audit) ✅
+> - [specs/04-migration-plan.md](specs/04-migration-plan.md) — Phase 0 steps + Definition of Done ✅
+> - [adr/README.md](adr/README.md) — Architecture Decision Records (ADR-0001…0009) ✅
+> - [research/findings-01.md](research/findings-01.md) — data sources, infra & tooling research ✅
+> - _(more module specs to come as we build each)_
+>
+> **Decisions log** (from planning Q&A):
+> - Name: keep NEXUS, re-expand acronym · Clients: Web + PWA (offline-first) · Data sharing: HDX-style (public + by-request + private) · Codebase: modular monorepo
+> - Response: full **Emergency Response & Coordination** module (shelters, dispatch, volunteers) → see new **Module M**
+> - Citizen trust: verification + reputation + corroboration threshold + community moderators; **light gamification only** (badges/recognition, no cash/airtime rewards)
+> - Data sources: design for **all four** — satellite/external APIs, IoT sensors, social/news listening, partner/agency feeds
+> - EWS: hybrid predictions · tiered warning authority · CAP-aligned severity · basic impact-based · full hazard set · split-view uncertainty · seeded risk zones (details in spec 01)
+> - **Life-safety: Module N adopted** — resilience (N8) + guaranteed/acknowledged delivery (N9) are treated as **foundation**, not features. See spec 02.
+> - **Engineering stack (ADRs):** TypeScript end-to-end · pnpm workspaces · Drizzle ORM + PostGIS/H3/pgrouting on Neon · Zod validation · Vitest+Supertest · node-cron→BullMQ/Redis for delivery · Serwist PWA · normalized `places` geography replacing the `district` string.
+> - **First milestone = Phase 0** (restructure + geography + RBAC + auth, existing features preserved). Definition of Done in spec 04.
+
+---
+
+## 0. How to read this document
+
+This plan is the single source of truth for the re-scoped N.E.X.U.S. platform. It
+is deliberately exhaustive — every module, feature, and sub-feature is listed so
+that (a) we know what "done" means, and (b) any developer who joins later can
+understand the whole system from one file.
+
+Sections:
+
+1. Vision & the pivot (what changed and why)
+2. Rebrand — keeping "NEXUS", re-expanding the acronym
+3. Who uses it — personas & roles
+4. **The full feature catalog** (the heart of this doc — all modules & sub-features)
+5. User roles & permissions matrix
+6. AI & ML strategy (today's AI + the future "national model")
+7. System architecture & the modular monorepo structure
+8. Data model — geography, hazards, datasets, alerts
+9. Alerting & broadcast design (CAP standard, geo-targeting)
+10. Non-functional requirements (scale, offline/PWA, security, i18n)
+11. Phased roadmap
+12. Open decisions still to make
+
+Legend for feature status:
+- ✅ **Exists** — already built in current NEXUS, will be kept/migrated
+- 🔁 **Evolve** — exists but must be generalized from "sanitation-only / Northern" to "all-hazard / nationwide"
+- 🆕 **New** — net-new for v2.0
+
+---
+
+## 1. Vision & the pivot
+
+### 1.1 What we have today
+The current NEXUS is an **AI-powered sanitation intelligence platform for Northern
+Ghana**, built for the UNICEF hackathon. It already does a lot:
+- Real-time sensor monitoring + AI overflow prediction
+- Flood assessments triggered by rainfall thresholds
+- Full fecal-sludge chain tracking (toilet → gatherer → facility)
+- AI hygiene educator (Gemini), weather heatmaps, community health scores
+- WhatsApp/SMS field reporting, emergency broadcasts, vulnerability scoring
+- Next.js dashboard with ~15 pages, Express backend with 26 controllers / 20 models
+
+### 1.2 The pivot (what you asked for)
+Grow from **one region, one sector** to **one country, all disasters**:
+
+| Dimension | From (today) | To (v2.0) |
+|-----------|--------------|-----------|
+| **Geography** | Northern Ghana | All 16 regions / 261 districts / down to town & village |
+| **Hazard scope** | Sanitation + flood | Floods, heavy rainfall, droughts, bushfires, disease outbreaks, and a framework to add more |
+| **Purpose** | Monitor & respond to sanitation | Predict, prevent, respond **and** become Ghana's standard disaster-data backbone |
+| **Data** | Operational data for one team | Nationwide historical + live data, **exportable** to NGOs, researchers, government |
+| **Users** | District officers, field workers | + Citizens, NGOs, researchers, government/national agencies, data consumers |
+| **AI** | Gemini assistants | + Predictive hazard models, and a future **national model** trained on our own data |
+
+### 1.3 The core insight driving this
+> Ghana lacks a single standard system that continuously gathers, stores, and shares
+> disaster & environmental data (past disease outbreaks, floods, bushfires, droughts).
+> Advanced countries have this backbone; Ghana does not. NEXUS becomes that backbone —
+> and because it owns the data, it can eventually train models that predict Ghana's
+> disasters better than any generic tool.
+
+### 1.4 Guiding principles (these constrain every design decision)
+1. **Prevention over reaction** — every feature should help act *before* a disaster.
+2. **Data is the asset** — collect clean, structured, geo-tagged, timestamped data always.
+3. **Nationwide from day one** — no hard-coded "Northern" assumptions anywhere.
+4. **Inclusive access** — works on cheap phones, weak signal, via SMS/WhatsApp/PWA, in local languages.
+5. **Built to scale & be handed over** — modular, documented, heavily commented, so new devs and eventually government IT can run it.
+6. **Standards-based** — align with WMO multi-hazard early-warning framework and the CAP alerting standard so we can integrate with NADMO/GMet and international systems later.
+
+---
+
+## 2. Rebrand — keep "NEXUS", re-expand the acronym
+
+We keep the recognizable **N.E.X.U.S.** name but redefine what it stands for, so it
+reflects the nation-wide, multi-hazard mission. Proposed expansions (pick one when we
+finalize — **recommendation first**):
+
+1. ⭐ **National Emergency & eXchange system for Universal Safety** *(recommended — captures both "emergency response" and the "data exchange/marketplace" idea)*
+2. **National Environmental eXus for Unified Safety**
+3. **National Early-warning eXchange for Universal Safety**
+
+Tagline: *"Ghana's national early-warning and disaster-intelligence platform."*
+
+Everything below is written to be brand-neutral so the final naming choice doesn't
+require rework.
+
+---
+
+## 3. Who uses it — personas
+
+| Persona | What they need | Primary surface |
+|---------|----------------|-----------------|
+| **Citizen / community member** | Report incidents, receive local warnings, learn what to do | PWA (mobile), SMS, WhatsApp |
+| **Field worker / volunteer** | Collect data, run assessments, upload photos offline | PWA (offline-first) |
+| **District officer (MMDA/NADMO district)** | Monitor their district, coordinate response, verify reports | Web dashboard |
+| **Regional coordinator** | Oversee all districts in a region, allocate resources | Web dashboard |
+| **National agency (NADMO, GMet, GHS, EPA, Fire Service)** | Country-wide situational awareness, issue official alerts | Web dashboard |
+| **NGO / humanitarian** | Access data, coordinate aid, run programs | Web + Data Hub |
+| **Researcher / academic** | Request datasets, study patterns | Data Hub |
+| **Government / policymaker** | Reports, trends, decision support | Web dashboards + exports |
+| **Data consumer (any)** | Browse/download/request open datasets & APIs | Data Hub (public) |
+| **Platform admin** | Manage users, roles, config, data quality | Admin panel |
+
+---
+
+## 4. The full feature catalog
+
+Features are grouped into **modules**. Each module maps directly to a backend feature
+folder and a frontend section (see §7). Sub-features are bulleted; status tags show what
+we keep vs. build.
+
+### Module A — Identity, Access & Geography (foundation)
+The base every other module depends on.
+
+- 🔁 **Authentication** — JWT (RS256), email/password, refresh tokens. *Evolve:* add phone-number + OTP login for citizens.
+- 🆕 **Multi-role RBAC** — roles from §5, permission checks per module/action, scoped to geography (a district officer only sees their district).
+- 🆕 **National geography service** — canonical hierarchy: `Country → Region (16) → District/MMDA (261) → Zone/Constituency → Town/Community/Village`. Everything (reports, hazards, alerts, datasets) is tagged to a place in this tree. Mirrors NADMO's own structure (national → 16 regional → 261 district → 900+ zonal offices).
+- 🆕 **Organizations & teams** — NGOs, agencies, assemblies as first-class org entities; users belong to orgs; data ownership tracked per org.
+- 🆕 **Account verification & vetting** — citizens self-serve; officials/NGOs/researchers require approval (needed for request-gated data).
+- 🔁 **User management** (admin) — activate/deactivate, assign roles + geographic scope.
+- 🆕 **Audit log** — who did what, when (critical for a system government may adopt).
+
+### Module B — Multi-Hazard Early Warning & Prediction 🆕 (the new core)
+Generalizes today's flood-only logic into a hazard framework aligned with the WMO
+4-pillar model (risk knowledge → monitoring/forecasting → warning → preparedness).
+
+> **📄 Fully specced:** see [specs/01-multi-hazard-ews.md](specs/01-multi-hazard-ews.md)
+> for hazard framework, event state machine, hybrid prediction pipeline, CAP severity,
+> impact-based forecasting, tiered warning authority, data model, APIs & jobs.
+
+- 🆕 **Hazard registry** — pluggable hazard types: `flood`, `heavy_rainfall`, `drought`, `bushfire`, `disease_outbreak`, `windstorm`, `extreme_heat`, `sanitation_failure` (existing), extensible via config so new hazards don't need code rewrites.
+- 🆕 **Hazard event lifecycle** — every event: `predicted → watch → warning → active → response → recovery → closed`, with severity levels (info/advisory/watch/warning/emergency) and confidence scores.
+- 🔁 **Flood prediction** — evolve existing rainfall-threshold flood assessments into a nationwide model using rainfall + historical flood zones + terrain.
+- 🆕 **Heavy-rainfall prediction** — ingest forecasts (Open-Meteo now; GMet integration later), flag districts crossing rainfall thresholds N hours ahead.
+- 🆕 **Drought monitoring** — track rainfall deficits, dry-spell length, temperature anomalies per district over time.
+- 🆕 **Bushfire risk** — dry-season + temperature + vegetation-dryness index; later integrate satellite fire data (e.g. NASA FIRMS).
+- 🆕 **Disease-outbreak risk** — surface case-count spikes from the Health module (§D) as hazard events; align with Ghana's IDSR/DHIMS2 categories.
+- 🆕 **Risk knowledge layer** — per-place vulnerability + exposure profiles (population, past events, infrastructure) so warnings can be **impact-based** ("flood likely to affect 3 schools + 1 clinic"), not just hazard-based.
+- 🔁 **Prediction engine abstraction** — a `PredictionService` interface so today's Gemini/heuristic predictions and tomorrow's Python ML models are swappable (see §6).
+- 🆕 **Automated triggers** — cron/stream jobs that watch data and auto-raise hazard events + draft alerts for human approval.
+
+### Module C — Nationwide Data Gathering & Incident Reporting 🆕/🔁
+The "always be collecting clean data" engine — includes citizen crowdsourcing.
+
+- 🔁 **Field assessments** — generalize sanitation/flood assessments into reusable, form-driven assessments per hazard type, with photos (Cloudinary), GPS, offline capture.
+- 🆕 **Citizen incident reports** — anyone can report a flood/fire/outbreak/sanitation issue via PWA, SMS, WhatsApp, or (future) voice note in local language. Geo-tagged, photo-attachable.
+- 🆕 **Report verification workflow** — Ushahidi-style: submitted → triaged → verified/rejected → promoted to a hazard event if warranted. Prevents misinformation. **Trust model (decided):** (1) officers/moderators verify; (2) **reputation score** per citizen so reliable reporters get fast-tracked; (3) **corroboration threshold** — multiple independent reports of the same incident auto-raise confidence; (4) **community moderators** — trusted locals (assembly members, teachers) can pre-verify in their area.
+- 🆕 **Light gamification** — badges & recognition for verified contributions (leaderboards optional). **No cash/airtime rewards** — deliberately, to avoid incentivizing fake reports in a data-collection system.
+- 🆕 **Historical data ingestion** — bulk import past events (floods, outbreaks, bushfires, droughts) from NADMO/GHS/GMet records, CSV/Excel upload, with source attribution.
+- 🆕 **Structured data schemas per hazard** — every record captures the fields researchers actually need (date, location to village level, severity, casualties, damage, response, source) so exports are valuable.
+- 🆕 **Data quality & dedup** — validation rules, duplicate detection, confidence/verification flags on every record (HDX-style QA mindset).
+- 🔁 **Sensor/IoT ingestion** — keep existing sensor endpoints; generalize to accept any device type (waste-level, water-level, weather, air quality) with a documented device API.
+- 🆕 **Offline-first sync** — PWA queues reports/assessments locally and syncs when signal returns (matches original offline-first vision).
+
+### Module D — Health & Disease Surveillance 🆕
+Bring disease outbreaks into the platform, aligned with Ghana's existing systems.
+
+- 🆕 **Case reporting** — clinics/field workers log suspected/confirmed cases by disease & location (cholera, malaria, measles, meningitis, etc. — IDSR priority diseases).
+- 🆕 **Outbreak detection** — threshold + trend spikes per district raise a `disease_outbreak` hazard event.
+- 🆕 **Line-list & contact-tracing-lite** — optional lightweight case tracking (inspired by SORMAS) without duplicating national systems.
+- 🔁 **Sanitation↔health linkage** — connect sanitation failures/flood contamination to disease risk (this is already the project's original thesis — now formalized).
+- 🆕 **Health facility registry** — clinics/hospitals as geo-tagged assets for impact-based warnings.
+- 🆕 **Interop-ready** — design exports/fields to be compatible with DHIMS2 categories so the platform can complement, not fight, existing health IT.
+
+### Module E — Sanitation (existing domain, now a module) ✅🔁
+Everything NEXUS already does, preserved and folded in as one hazard/sector module.
+
+- ✅ **Sanitation unit monitoring** + AI overflow prediction
+- ✅ **Fecal-sludge chain** — job lifecycle (toilet → gatherer → facility → treatment)
+- ✅ **Toilet registry** — verification, QR codes, condition tracking
+- ✅ **Gatherers roster** — availability, completion rates
+- ✅ **Treatment facilities** registry
+- ✅ **Illegal dump sites** — with AI severity analysis
+- ✅ **Schools MHM** (menstrual hygiene management) metrics
+- ✅ **Community health scores** — algorithmic district sanitation index
+- 🔁 **Generalize scope** — extend from Northern districts to any district; keep UNICEF/child-focus features as they're strong differentiators.
+
+### Module F — Alerts, Broadcasts & Notifications 🔁🆕
+From "emergency broadcast feed" to a real geo-targeted, multi-channel alerting system.
+
+- 🔁 **Alert management** — real-time alerts from sensors/hazards with AI recommendations (exists) → generalized to all hazard types.
+- 🆕 **CAP-compliant alerts** — structure alerts on the Common Alerting Protocol (event, severity, urgency, certainty, area polygon/geocode, instructions). Makes us interoperable with national/international systems.
+- 🆕 **Geo-targeted broadcasts** — target an alert to the whole nation, a region, a district, a town, or a drawn polygon. This is the "nationwide OR select-area broadcast" you described.
+- 🔁 **Multi-channel delivery** — in-app + push (PWA web-push) + SMS (Arkesel) + WhatsApp (Meta) + email. Design a channel abstraction so cell-broadcast can be added if a telco/government partnership happens.
+- 🆕 **Subscriptions & preferences** — citizens subscribe to their region/district/town and choose channels + language.
+- 🆕 **Alert approval workflow** — auto-drafted alerts require an authorized officer to approve before mass send (prevents false alarms).
+- ✅ **AI-generated alert copy** — Gemini writes plain-language, localized warning text (exists for broadcasts).
+- 🆕 **Delivery tracking** — sent/delivered/read metrics per broadcast.
+
+### Module G — Data Hub (open + request-gated exchange) 🆕 (major new pillar)
+The HDX-style data-sharing platform — our path to national relevance & sustainability.
+
+- 🆕 **Dataset catalog** — browsable, searchable datasets (by hazard, location, time range, format, license, source) with rich metadata.
+- 🆕 **Three sharing modes** (HDX model): **Public** (open download), **By-request** (approval workflow), **Private** (org-internal).
+- 🆕 **Data request workflow** — an NGO/researcher requests a gated dataset → owner/admin approves/denies → access granted with terms. Full audit trail.
+- 🆕 **Export formats** — CSV, GeoJSON, Excel, PDF reports; scheduled/one-off.
+- 🆕 **Public Data API** — documented REST API + API keys so partners can pull data programmatically (e.g. "flood patterns for Region X, 2015–2025").
+- 🆕 **Licensing & attribution** — each dataset carries a license (open/CC, restricted) and required attribution.
+- 🆕 **Privacy & anonymization** — automatic PII stripping / aggregation for public tiers (citizens' personal data never leaks).
+- 🆕 **Dataset QA/curation** — admin review before a dataset goes public (metadata completeness, integrity), mirroring HDX's manual QA.
+- 🆕 **Usage analytics** — who downloaded/requested what; demonstrates impact to funders/government.
+
+### Module H — Maps & Geospatial Intelligence 🔁
+- ✅ **Map explorer** — Leaflet + GeoJSON layers (toilets, facilities, flood zones, vulnerability).
+- 🔁 **National multi-hazard map** — layers for every hazard type, filterable by region/district/time; heatmaps of risk.
+- 🆕 **Live situational map** — active hazard events, alerts, and citizen reports in real time.
+- 🆕 **Historical playback** — scrub through time to see how past events unfolded (great for research + pitching to government).
+- 🆕 **Admin boundary layers** — official Ghana region/district/community boundaries as base layers.
+
+### Module I — Weather & Climate 🔁
+- ✅ **Real-time weather** (Open-Meteo) + 24h precipitation/temperature heatmaps + AI briefings.
+- 🔁 **Nationwide coverage** — all districts, not just Northern.
+- 🆕 **Forecast ingestion & storage** — persist forecasts vs. actuals to build our own historical climate dataset (feeds the future model).
+- 🆕 **GMet integration (planned)** — official Ghana Meteorological Agency data when a data-sharing agreement is possible.
+
+### Module J — AI Assistants & Intelligence 🔁🆕
+(See §6 for the full AI/ML strategy; these are the user-facing AI features.)
+- ✅ **AI educator** — Gemini hygiene/safety chatbot → 🔁 broaden to all-hazard preparedness advice, localized.
+- ✅ **AI news feed** — curated WASH/flood news + sentiment → 🔁 broaden to all-hazard news, nationwide.
+- ✅ **AI severity analysis** — dump-site/report severity scoring → 🔁 generalize to any incident photo/text.
+- ✅ **AI briefings** — plain-language weather/situation summaries.
+- 🆕 **AI report triage assistant** — suggests verification status & likely hazard type for incoming citizen reports.
+- 🆕 **Natural-language data query (future)** — "show me cholera cases near flooded areas in 2024" over the Data Hub.
+
+### Module K — Analytics, Reports & Decision Support 🔁
+- ✅ **District PDF/CSV reports** + trend charts → 🔁 national + regional + district levels.
+- 🆕 **Executive dashboards** — national situational overview for agencies/policymakers.
+- 🔁 **Community/district health & risk scores** — generalized composite risk index per place.
+- 🆕 **Trend analytics** — seasonality, year-over-year, hotspot detection across hazards.
+- 🆕 **Impact & response metrics** — response times, coverage, outcomes (accountability).
+
+### Module L — Admin, Config & Platform Ops 🔁🆕
+- ✅ **Demo simulator** — keep for demos/onboarding (sensor spike / flood / full scenario).
+- 🔁 **User & role management** — with geographic scoping.
+- 🆕 **Hazard-type & threshold config** — admins tune thresholds per region without code changes.
+- 🆕 **Content management** — educational content, preparedness guides, blog (exists) — multilingual.
+- 🆕 **Integration settings** — SMS/WhatsApp/weather/AI keys & webhooks managed in one place.
+- 🆕 **System health & job monitoring** — cron/queue status, ingestion health.
+
+### Module M — Emergency Response & Coordination 🆕 (new pillar)
+Moves the platform from *warning* people to *coordinating the response* — the "preparedness
+& response" pillar of the WMO model. Activated when a hazard event reaches `active`/`response`.
+
+- 🆕 **Shelters & safe zones** — registry of evacuation shelters/safe zones (geo-tagged), with capacity, current occupancy, facilities (water, medical), and open/closed status. Surfaced to citizens ("nearest open shelter") during an event.
+- 🆕 **Relief inventory** — track relief supplies (food, water, tents, medical kits) by stock location; record distributions; flag shortages. Gives agencies/NGOs real logistics visibility.
+- 🆕 **Incident dispatch & tasking** — during an active event, create tasks (rescue, assessment, distribution, repair), assign to teams/field workers, track status (`open → assigned → in-progress → done`), all on the live map.
+- 🆕 **Volunteer & resource coordination** — register volunteers (skills, availability, location) and assets (vehicles, boats, equipment); match them to active incidents by proximity & skill.
+- 🆕 **Response timeline & after-action** — every action logged; auto-generates an after-action record per event (what happened, response time, resources used) — feeds analytics + becomes historical data.
+- 🔁 **Ties to hazards & alerts** — dispatch/shelters activate off a hazard event (Module B) and are announced via broadcasts (Module F).
+
+### Cross-cutting capabilities (apply to all modules)
+- 🆕 **Internationalization (i18n)** — English + major Ghanaian languages (Twi, Ewe, Dagbani, Ga, Hausa) for citizen-facing surfaces + AI output.
+- 🆕 **Offline-first PWA** — installable, service-worker caching, background sync.
+- 🆕 **Accessibility & low-bandwidth** — lightweight pages, SMS/USSD fallback paths.
+- 🔁 **Real-time** — Socket.IO (already a dependency) for live maps, alerts, dashboards.
+- 🆕 **Notifications infra** — one service, many channels (in-app/push/SMS/WhatsApp/email).
+
+---
+
+## 5. User roles & permissions matrix
+
+Roles are **geography-scoped**: a role applies within an assigned place in the geography
+tree (national scope for national agencies, a region for a coordinator, etc.).
+
+| Role | Scope | Can do |
+|------|-------|--------|
+| **Super Admin** | National | Everything: config, users, data QA, all data |
+| **National Agency** (NADMO/GMet/GHS/EPA/Fire) | National | View all, issue official alerts, approve gated data, publish datasets |
+| **Regional Coordinator** | Region | Manage districts in region, approve alerts, view regional data |
+| **District Officer** | District | Manage district data, verify reports, run assessments, request alerts |
+| **Field Worker / Volunteer** | Assigned area | Collect data, run assessments, submit reports (offline), accept dispatch tasks |
+| **Community Moderator** | Their locality | Pre-verify citizen reports in their area before officers see them |
+| **NGO / Partner** | Assigned area(s) | View shared data, request datasets, coordinate programs, manage relief inventory |
+| **Researcher** | — | Browse catalog, request gated datasets, download open data |
+| **Data Consumer** (public) | — | Browse & download public datasets, use public API |
+| **Citizen** | Their locality | Report incidents, subscribe to alerts, view public info, learn |
+
+Permissions are enforced by an RBAC middleware keyed on `(role, action, resource, geoScope)`.
+This must be a first-class, well-documented part of the foundation module.
+
+---
+
+## 6. AI & ML strategy
+
+Two horizons, cleanly separated by an abstraction so we never have to rewrite callers.
+
+### 6.1 Today (Phase 1–2): Gemini + heuristics
+- Keep **Google Gemini 2.5 Flash** for: educator chatbot, news curation, severity analysis, alert/briefing text generation, report triage suggestions.
+- Keep **rule/threshold heuristics** for predictions (rainfall thresholds → flood watch, case spikes → outbreak).
+- Wrap all of this behind a **`PredictionService` / `AIService` interface** in the backend so the *how* can change without touching controllers.
+
+### 6.2 Near future (Phase 3): dedicated ML service
+- A separate **Python microservice** (FastAPI + scikit-learn/TensorFlow, matching the original PDF's stack) for real predictive models: flood risk, overflow, drought index, outbreak forecasting.
+- Backend talks to it over HTTP; it's independently deployable and scalable.
+- Trained initially on public/historical data + the data we ingest.
+
+### 6.3 Long-term vision (Phase 4+): the "national model"
+- As the Data Hub accumulates clean, nationwide, geo/time-tagged data (floods, outbreaks, bushfires, droughts, weather, sanitation), we use it to **train Ghana-specific models** that outperform generic tools.
+- This is the compounding moat: **more usage → more data → better predictions → more usage.**
+- Design decisions that make this possible *must start now*: consistent schemas, provenance, versioning, and a data lake/warehouse-friendly export path. (This is why Module C insists on structured schemas from day one.)
+
+### 6.4 Data flywheel (the strategic thesis)
+```
+Citizens & field workers report  ─┐
+Sensors & weather ingest         ─┤→  Clean structured data (Module C)
+Historical imports               ─┘        │
+                                           ▼
+                         Data Hub (Module G) ──exports──► NGOs/researchers/govt
+                                           │
+                                           ▼
+                         National ML model (§6.3) ──► better predictions (Module B)
+                                           │
+                                           ▼
+                         better warnings ──► more trust ──► more users ──► more data ↺
+```
+
+---
+
+## 7. System architecture & the modular monorepo
+
+Chosen strategy: **restructure into a modular monorepo.** Keep the existing business
+logic, reorganize it into clear feature modules so it scales and new devs can navigate.
+
+### 7.1 High-level architecture
+```
+                    ┌─────────────────────────────────────────┐
+   Citizens (PWA)   │            Client surfaces                │
+   Officials (Web)  │  Next.js app (web dashboard + PWA)        │
+   SMS / WhatsApp   │  + SMS/WhatsApp/USSD gateways             │
+                    └───────────────────┬───────────────────────┘
+                                        │ REST + WebSocket
+                    ┌───────────────────▼───────────────────────┐
+                    │        API Gateway (Express, v1)           │
+                    │  Auth · RBAC · rate-limit · validation     │
+                    └───────────────────┬───────────────────────┘
+        ┌───────────────┬───────────────┼───────────────┬───────────────┐
+        ▼               ▼               ▼               ▼               ▼
+   Feature modules (hazards, reports, health, sanitation, alerts,
+   datahub, weather, geography, analytics, ai) — each: routes →
+   controllers → services → models
+        │                                               │
+        ▼                                               ▼
+   PostgreSQL (Neon)                            ML service (Python/FastAPI, Phase 3)
+   + object storage (Cloudinary)                External: Open-Meteo, GMet, SMS, WhatsApp
+```
+
+### 7.2 Repository layout (top level)
+```
+nexus/
+├── docs/                     # this plan + architecture decision records (ADRs) + API docs
+├── nexus-backend/            # Node/Express API (modular)
+├── nexus-frontend/           # Next.js web + PWA
+├── nexus-ml/                 # Python ML service (added in Phase 3)
+├── packages/                 # (optional) shared types/constants between FE & BE
+└── README.md
+```
+
+### 7.3 Backend structure (feature-module based)
+Each module is self-contained: routes → controller → service → model, plus its own
+validators and tests. A module can be understood (and worked on) in isolation.
+
+```
+nexus-backend/
+├── server.js
+├── src/
+│   ├── config/               # env, database, constants (hazard types, roles, geo)
+│   ├── core/                 # cross-cutting foundation
+│   │   ├── auth/             # login, JWT, OTP, refresh
+│   │   ├── rbac/             # roles, permissions, geo-scope middleware
+│   │   ├── geography/        # region/district/town tree + lookups
+│   │   ├── users/            # users, orgs, teams, verification
+│   │   ├── notifications/    # channel abstraction (in-app/push/SMS/WhatsApp/email)
+│   │   └── audit/            # audit logging
+│   ├── modules/
+│   │   ├── hazards/          # hazard registry, events, prediction engine (Module B)
+│   │   ├── reports/          # citizen reports, assessments, verification (Module C)
+│   │   ├── ingestion/        # sensors/IoT, bulk import, sync (Module C)
+│   │   ├── health/           # disease surveillance (Module D)
+│   │   ├── sanitation/       # units, sludge, toilets, gatherers, facilities, dumps, schools (Module E)
+│   │   ├── alerts/           # CAP alerts, broadcasts, subscriptions (Module F)
+│   │   ├── datahub/          # datasets, catalog, requests, export, public API (Module G)
+│   │   ├── geospatial/       # map layers, GeoJSON, boundaries (Module H)
+│   │   ├── weather/          # weather + forecasts + history (Module I)
+│   │   ├── ai/               # Gemini gateway, educator, news, triage, ML client (Module J)
+│   │   ├── analytics/        # scores, reports, dashboards, exports (Module K)
+│   │   ├── response/         # shelters, relief inventory, dispatch, volunteers (Module M)
+│   │   └── admin/            # config, simulator, content, system health (Module L)
+│   ├── shared/               # middleware, errors, utils, validators, base model helpers
+│   ├── integrations/         # external adapters: openMeteo, gmet, arkesel, whatsapp, cloudinary, email
+│   ├── jobs/                 # cron/queue workers (predictions, ingestion, digests)
+│   └── db/                   # schema, migrations, seeders
+└── tests/
+```
+
+**Module internal convention** (documented once, followed everywhere):
+```
+modules/<name>/
+├── <name>.routes.js
+├── <name>.controller.js
+├── <name>.service.js
+├── <name>.model.js          # or models/ if several
+├── <name>.validators.js
+├── <name>.types.js          # JSDoc typedefs / shared shapes
+└── README.md                # what this module does, its endpoints, its data
+```
+
+> **Migration note:** today's 26 controllers/20 models map cleanly onto these modules —
+> e.g. `toiletController`, `gathererController`, `sludgeJobController`, `dumpController`,
+> `facilityController`, `unicefController` → `modules/sanitation`; `weatherHistoryController`
+> → `modules/weather`; `broadcastController`/`alertController` → `modules/alerts`;
+> `newsController`/`educatorController` → `modules/ai`. So this is a *reorganization*, not a rewrite.
+
+### 7.4 Frontend structure (Next.js App Router + PWA)
+Route groups by audience; feature code colocated; PWA/offline as first-class.
+
+```
+nexus-frontend/
+├── public/
+│   ├── manifest.json         # PWA manifest
+│   └── icons/
+├── src/
+│   ├── app/
+│   │   ├── (public)/         # landing, about, public data hub, docs
+│   │   │   ├── data/         # public dataset catalog + download (Module G)
+│   │   │   └── learn/        # preparedness guides (multilingual)
+│   │   ├── (auth)/           # login, register, verify, OTP
+│   │   ├── (citizen)/        # citizen PWA: report, my-area, alerts, subscriptions
+│   │   ├── (dashboard)/      # officials/NGOs
+│   │   │   ├── overview/     # national/regional/district situational view
+│   │   │   ├── hazards/      # multi-hazard events & predictions
+│   │   │   ├── map/          # live + historical multi-hazard map
+│   │   │   ├── reports/      # incoming citizen reports + verification queue
+│   │   │   ├── health/       # disease surveillance
+│   │   │   ├── sanitation/   # existing sanitation suite (units, sludge, toilets, …)
+│   │   │   ├── alerts/       # create/approve/track broadcasts
+│   │   │   ├── weather/      # heatmaps + forecasts
+│   │   │   ├── analytics/    # dashboards, reports, exports
+│   │   │   ├── datahub/      # manage datasets, requests, approvals
+│   │   │   ├── response/     # shelters, relief, dispatch board, volunteers (Module M)
+│   │   │   └── educator/     # AI assistant
+│   │   └── (admin)/          # users, roles, config, simulator, system health
+│   ├── features/             # feature-scoped hooks/components/api-clients (mirror BE modules)
+│   │   ├── hazards/ reports/ health/ sanitation/ alerts/ datahub/ weather/ …
+│   ├── components/           # shared UI (ui/, layout/, map/, charts/, forms/)
+│   ├── lib/                  # api client, query client, auth, i18n, pwa/offline sync
+│   ├── context/              # providers
+│   ├── hooks/                # shared hooks
+│   ├── locales/              # i18n message catalogs (en, tw, ee, dag, …)
+│   └── types/                # shared TS types (ideally generated from BE)
+└── next.config.ts            # + PWA/service-worker config
+```
+
+### 7.5 Documentation & maintainability (non-negotiable, per your ask)
+- **Every module has a `README.md`** describing purpose, endpoints, and data.
+- **Heavy inline comments** on services and any non-obvious logic; JSDoc on public functions.
+- **ADRs in `docs/adr/`** — one short file per significant decision (why Postgres, why modular, why CAP, etc.).
+- **OpenAPI/Swagger** spec for the API, kept in `docs/`.
+- **CONTRIBUTING.md** — folder conventions, how to add a new module/hazard, coding standards.
+- **Consistent conventions** so a new dev can predict where any file lives.
+
+---
+
+## 8. Data model — geography, hazards, datasets, alerts
+
+Core entities (high level; full schema designed in implementation phase):
+
+- **Geography:** `regions`, `districts`, `communities` (self-referential place tree) — every other table references a `place_id`.
+- **Users & orgs:** `users`, `organizations`, `memberships`, `roles`, `permissions`, `user_geo_scope`.
+- **Hazards:** `hazard_types` (config), `hazard_events` (status, severity, confidence, place, time), `predictions`, `risk_profiles` (per place).
+- **Reports & data:** `incident_reports`, `assessments`, `assessment_forms`, `sensor_devices`, `sensor_readings`, `imported_records`.
+- **Health:** `disease_cases`, `health_facilities`, `outbreaks`.
+- **Sanitation:** existing tables (`sanitation_units`, `registered_toilets`, `sludge_jobs`, `gatherers`, `waste_facilities`, `illegal_dump_sites`, `school_sanitation_metrics`, `community_health_scores`).
+- **Alerts:** `alerts` (CAP fields), `broadcasts`, `subscriptions`, `deliveries`.
+- **Data Hub:** `datasets`, `dataset_versions`, `data_requests`, `api_keys`, `download_logs`, `licenses`.
+- **Ops:** `audit_logs`, `notifications`, `jobs`.
+
+Design rules: every event/record is **geo-tagged** (to village where possible), **timestamped**, **source-attributed**, and carries a **verification/confidence** flag. This is what makes exports valuable and the future model trainable.
+
+---
+
+## 9. Alerting & broadcast design (CAP + geo-targeting)
+
+- **Standard:** model alerts on the **Common Alerting Protocol (CAP)** — fields for event, category, urgency, severity, certainty, effective/expiry time, affected **area (polygon or geocode)**, and instructions. This makes us interoperable with NADMO/GMet and international systems and future-proofs cell-broadcast integration.
+- **Targeting:** select audience by geography tree node (nation → region → district → town) **or** by drawing a polygon on the map. Everyone whose subscription/location falls inside is notified.
+- **Channels:** in-app, web-push (PWA), SMS (Arkesel), WhatsApp (Meta), email — behind one notification service. Cell broadcast is the aspirational channel that a telco/government partnership unlocks.
+- **Governance:** auto-drafted alerts (from Module B triggers) always require an authorized officer's approval before mass send. Full delivery tracking + audit.
+
+---
+
+## 10. Non-functional requirements
+
+- **Scale:** stateless API (horizontal scale), connection-pooled Postgres (Neon serverless), background jobs off the request path, pagination everywhere, caching for read-heavy public data/API.
+- **Offline-first PWA:** service worker caching, IndexedDB queue for reports/assessments, background sync, conflict handling.
+- **Low-bandwidth & inclusion:** SMS/WhatsApp/USSD fallbacks, lightweight pages, local languages.
+- **Security & privacy:** RBAC + geo-scoping, input validation (express-validator), Helmet, rate limiting, secrets management, PII anonymization for public data, full audit trail. Important because government adoption demands it.
+- **Reliability:** health checks, job monitoring, graceful degradation if an external API (weather/AI/SMS) is down.
+- **Observability:** structured logging (morgan + app logs), error tracking, delivery/usage metrics.
+- **Data governance:** dataset licensing, provenance, versioning, retention policies.
+
+---
+
+## 11. Phased roadmap
+
+Each phase is shippable and demoable on its own.
+
+### Phase 0 — Foundation & restructure  → **specced in [spec 04](specs/04-migration-plan.md); ✅ substantially DONE (2026-07-02)**
+> **Built & verified on a Neon dev branch:** pnpm workspaces + TypeScript + Vitest/CI (0.1) ·
+> Drizzle migrations replacing boot-time DDL (0.2) · `places` geography — 16 regions / 261
+> districts, PostGIS + ltree (0.3) · orgs + geography-scoped RBAC with `can()` (0.4) ·
+> phone-OTP auth + refresh tokens + account verification (0.5) · audit trail + notifications
+> skeleton (0.6) · sanitation `place_id` geo-tagging + backfill (530 rows) via a district
+> resolver (0.7a) · **CJS→TS runtime bridge** — new auth-v2 + geography routers live over HTTP
+> under tsx, legacy API untouched (0.7b) · docs/OpenAPI/READMEs (0.8).
+> **Remaining follow-ons (non-blocking):** finish moving legacy sanitation controllers into
+> `modules/sanitation` as TS; resolve the 57 `"Northern"` rows; add Guan District geometry +
+> district population; backend ESLint in CI.
+- pnpm workspaces + TypeScript + Drizzle migrations (replace boot-time `schema.sql`); Vitest/CI.
+- Normalized `places` geography (16 regions / 261 districts, PostGIS) replacing the `district` string.
+- RBAC + geo-scoping + orgs; phone-OTP auth (Arkesel) alongside email/password; audit log.
+- Migrate existing sanitation features into `modules/sanitation`, backfilled to `place_id`, **no behavior change**.
+- Docs skeleton done (ADRs, CONTRIBUTING, specs). See spec 04 for the step-by-step + Definition of Done.
+
+> **Also folded into the foundation (from Module N / spec 02):** design the alert path for
+> **resilient/degraded-mode operation (N8)** and **guaranteed, acknowledged delivery (N9)** —
+> these are reliability requirements, not later features.
+
+### Phase 1 — Multi-hazard core + nationwide
+- Hazard registry + event lifecycle; generalize flood logic; add heavy-rainfall & drought monitoring.
+- External sources: FIRMS (bushfire, easy Node win) → GloFAS (floods) → CHIRPS (drought); nationwide weather; national multi-hazard map.
+- Citizen incident reporting + verification workflow (PWA + SMS/WhatsApp).
+- **Life-safety (Module N, Tier 1 start):** vulnerable-persons registry (N4).
+
+### Phase 2 — Alerts, health & citizen engagement
+- CAP alerts + geo-targeted multi-channel broadcasts + subscriptions, **with guaranteed/acknowledged delivery (N9), signed alerts (N10), and last-mile community/radio channels (N6)**.
+- **"I'm Safe" check-in (N1)** + SOS (N2) tied to active events.
+- Disease surveillance module (case reporting, outbreak detection).
+- Bushfire risk; PWA offline-first hardening (**degraded-mode, N8**); i18n (first local languages).
+
+### Phase 3 — Data Hub + ML service
+- Dataset catalog, public/by-request/private sharing, data-request workflow, public API, licensing, anonymization.
+- Historical data ingestion (import past disasters).
+- Python ML service; move predictions from heuristics/Gemini to trained models.
+
+### Phase 4 — National model & partnerships
+- Train Ghana-specific models on accumulated data; natural-language data query.
+- Integrations with GMet/NADMO/GHS where agreements allow; government onboarding.
+- Sustainability model (per §12).
+
+> Ordering rationale: we build the **data-collection spine first** (Phases 0–2) because
+> everything valuable later — the Data Hub and the national model — depends on clean data
+> flowing in from day one.
+
+---
+
+## 12. Open decisions still to make
+
+These don't block starting Phase 0, but we should settle them soon:
+
+1. **Final acronym expansion** — pick from §2 (recommend option 1).
+2. **Sustainability model** — you chose HDX-style open + request-gated sharing (free/mission).
+   Later, do we add a paid API/premium tier for revenue (per the original PDF), or stay
+   fully open and fund via government/NGO/grants? Affects Data Hub billing design.
+3. **Hosting & infra** — stay on Neon + (Vercel for FE / Render/Railway/Fly for BE)? Where does the Python ML service live? Object storage: keep Cloudinary or move to S3-compatible for large datasets?
+4. **Geography data source** — official Ghana region/district/community boundary GeoJSON + population figures (for impact-based warnings). Need to source these.
+5. **Local languages** — confirm the priority set (Twi, Ewe, Dagbani, Ga, Hausa?) and how AI localizes.
+6. **Institutional partners** — early conversations with NADMO/GMet/GHS shape data interop and credibility. Who do we approach first?
+7. ~~**IoT hardware**~~ — **Decided:** design for IoT as one of four data sources (documented device ingestion API); build it in Phase 2–3, software+citizen data first.
+8. **Native mobile later?** — PWA now (decided); revisit a native app if app-store presence/push reliability becomes a constraint.
+
+**Resolved in detailed planning (2026-07-02):** Emergency Response module = full (shelters + dispatch + volunteers, Module M) · Citizen trust = verification + reputation + corroboration + community moderators, light gamification only · Data sources = all four · EWS specifics = see [spec 01](specs/01-multi-hazard-ews.md). New module-level open questions live at the bottom of each detailed spec (e.g. spec 01 §17: PostGIS availability, GloFAS/FIRMS keys, population data source, disease baselines, drought normals).
+
+---
+
+## Appendix A — Sources informing this plan
+- Ghana NADMO structure & flood/bushfire early-warning coordination (NADMO, GMet, WRC): https://www.nadmo.gov.gh/ , https://www.mint.gov.gh/agencies/national-disaster-management-organization/
+- WMO multi-hazard early-warning 4-pillar framework & impact-based forecasting: https://www.undrr.org/reports/global-status-mhews-2025
+- Common Alerting Protocol (CAP) standard & cell broadcast: https://wmo.int/site/wmo-common-alerting-protocol , https://en.wikipedia.org/wiki/Common_Alerting_Protocol
+- Humanitarian Data Exchange (HDX) data-sharing model (public/by-request/private, QA, API): https://data.humdata.org/about
+- Ghana disease surveillance (IDSR / DHIMS2 / SORMAS): https://bmcpublichealth.biomedcentral.com/articles/10.1186/s12889-015-1397-y
+- Ushahidi crowdsourced crisis reporting & verification: https://www.ushahidi.com/

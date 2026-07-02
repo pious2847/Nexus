@@ -61,6 +61,14 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 app.use('/api/v1', routes);
 
+// New TypeScript core routers (auth-v2, geography). Requires running under tsx.
+// Wrapped so a failure here can never take down the legacy API.
+try {
+  require('./src/core/http/register').registerCoreRoutes(app);
+} catch (err) {
+  console.error('[core] core routes not mounted:', err.message);
+}
+
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.method} ${req.path} not found` });
 });

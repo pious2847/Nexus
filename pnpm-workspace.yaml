@@ -1,0 +1,19 @@
+packages:
+  - 'nexus-backend'
+  - 'nexus-frontend'
+  - 'packages/*'
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
+
+# Approve build scripts for trusted deps (pnpm 10+ requires explicit opt-in).
+# esbuild -> Vitest/drizzle-kit; sharp -> Next image; unrs-resolver -> eslint.
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - unrs-resolver
+
+# Don't run a pre-check install before every `pnpm run` (avoids spurious failures).
+verifyDepsBeforeRun: false

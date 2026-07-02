@@ -48,11 +48,11 @@ async function getClient() {
 }
 
 async function initDb() {
-  const fs = require('fs');
-  const path = require('path');
-  const schema = fs.readFileSync(path.join(__dirname, '../db/schema.sql'), 'utf8');
-  await query(schema);
-  console.log('[DB] Schema initialized on Neon PostgreSQL');
+  // Schema is now managed by versioned migrations (ADR-0003), not executed on
+  // boot. We only verify connectivity here. To create/update the schema, run:
+  //   pnpm --filter nexus-backend db:migrate
+  await query('SELECT 1');
+  console.log('[DB] Connected — schema managed by migrations (run db:migrate to apply)');
 }
 
 module.exports = { query, queryWithRetry, getClient, getPool, initDb };

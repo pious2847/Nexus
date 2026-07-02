@@ -1,0 +1,160 @@
+openapi: 3.0.3
+info:
+  title: N.E.X.U.S. API
+  version: 2.0.0
+  description: >
+    National multi-hazard disaster-intelligence platform for Ghana. This spec covers
+    the endpoints implemented in the new TypeScript core (Phase 0). Legacy sanitation
+    endpoints under /api/v1/* continue to work and will be documented as they migrate.
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local dev
+
+components:
+  schemas:
+    Envelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data: {}
+    Place:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        parent_id: { type: string, format: uuid, nullable: true }
+        level: { type: string, enum: [country, region, district, constituency, community] }
+        code: { type: string, nullable: true }
+        name: { type: string }
+        population: { type: integer, nullable: true }
+        path: { type: string }
+    Tokens:
+      type: object
+      properties:
+        user: { type: object }
+        accessToken: { type: string }
+        refreshToken: { type: string }
+
+paths:
+  /health:
+    get:
+      summary: Service health
+      responses:
+        '200': { description: OK }
+
+  /auth-v2/otp/request:
+    post:
+      summary: Request a phone login OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: '+233201234567' }
+      responses:
+        '200': { description: OTP sent (devCode returned in non-production) }
+        '400': { description: Invalid phone }
+        '429': { description: Resend cooldown }
+
+  /auth-v2/otp/verify:
+    post:
+      summary: Verify OTP and log in (creates a citizen on first login)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone: { type: string }
+                code: { type: string, example: '123456' }
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/Tokens' } }
+        '401': { description: Invalid/expired code }
+
+  /auth-v2/refresh:
+    post:
+      summary: Rotate a refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties: { refreshToken: { type: string } }
+      responses:
+        '200': { description: New token pair }
+        '401': { description: Invalid/expired refresh token }
+
+  /auth-v2/logout:
+    post:
+      summary: Revoke a refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties: { refreshToken: { type: string } }
+      responses:
+        '200': { description: Logged out }
+
+  /geography/regions:
+    get:
+      summary: List the 16 regions
+      responses:
+        '200':
+          description: Regions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Place' } }
+
+  /geography/districts:
+    get:
+      summary: List districts (optionally filtered by region)
+      parameters:
+        - in: query
+          name: region
+          schema: { type: string }
+          description: Region name or id
+      responses:
+        '200': { description: Districts }
+
+  /geography/resolve:
+    get:
+      summary: Resolve a legacy district string to a place (normalized + fuzzy)
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string, example: 'Sagnarigu' }
+      responses:
+        '200': { description: Resolve result or null }
+        '400': { description: Missing q }
+
+  /geography/district-for-point:
+    get:
+      summary: District whose boundary contains a point
+      parameters:
+        - { in: query, name: lng, required: true, schema: { type: number } }
+        - { in: query, name: lat, required: true, schema: { type: number } }
+      responses:
+        '200': { description: Containing district or null }
+        '400': { description: Missing/invalid coordinates }
