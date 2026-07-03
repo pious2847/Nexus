@@ -58,7 +58,11 @@ export function buildAlertsRouter({ alerts, rbac }: CoreServices): Router {
   router.post('/:id/publish', authenticate, async (req, res) => {
     try {
       const alert = await alerts.publish(String(req.params.id), actorOf(req));
-      res.json({ success: true, message: `Published to ${alert.recipients} subscriber(s)`, data: alert });
+      res.json({
+        success: true,
+        message: `Published to ${alert.recipients} in-app subscriber(s), ${alert.sms_delivered}/${alert.sms_attempted} SMS delivered`,
+        data: alert,
+      });
     } catch (err) {
       if (err instanceof PublishForbiddenError) {
         res.status(403).json({ success: false, message: err.message });

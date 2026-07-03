@@ -1,19 +1,24 @@
 /**
  * Alerts service — draft a CAP alert from a hazard event, then publish it under
- * tiered authority (spec §11) and fan out in-app notifications to subscribers of
- * the affected area. Multi-channel delivery (SMS/push/WhatsApp/voice) layers on
- * top of the notification step later.
+ * tiered authority (spec §11) and fan out to subscribers of the affected area:
+ * in-app notifications (always) plus SMS (spec 02 N9 — guaranteed reach, since
+ * in-app alone only reaches citizens with the app open). Push/WhatsApp/voice
+ * layer on top of the same fan-out step later.
  */
 import type { CapSeverity } from '@nexus/shared';
 import type { Db } from '../../shared/db';
 import type { AuditRecorder } from '../../core/audit/audit.service';
 import type { RbacService } from '../../core/rbac/rbac.service';
 import type { NotificationsService } from '../../core/notifications/notifications.service';
+import { sendSms as defaultSendSms, type SmsResult } from '../../integrations/arkesel';
 import * as repo from './alerts.repository';
 import type { AlertRow } from './alerts.repository';
 import { requiredPublishPermission, toCapJson } from './alerts.cap';
+import { formatAlertSms } from './alerts.sms';
 
 export class PublishForbiddenError extends Error {}
+
+type SmsSender = (to: string, message: string) => Promise<SmsResult>;
 
 export class AlertsService {
   constructor(
@@ -21,6 +26,7 @@ export class AlertsService {
     private readonly rbac: RbacService,
     private readonly notifications: NotificationsService,
     private readonly audit?: AuditRecorder,
+    private readonly sendSms: SmsSender = defaultSendSms,
   ) {}
 
   getAlert(id: string) {
@@ -112,14 +118,27 @@ export class AlertsService {
       recipients = userIds.length;
     }
 
-    await repo.setPublished(this.db, alertId, userId, recipients);
+    // Fan out SMS to subscribers who opted in (guaranteed reach — spec 02 N9).
+    let smsAttempted = 0;
+    let smsDelivered = 0;
+    if (placePath) {
+      const smsSubscribers = await repo.findSmsSubscribers(this.db, placePath);
+      const message = formatAlertSms({ headline: alert.headline, instruction: alert.instruction });
+      for (const sub of smsSubscribers) {
+        smsAttempted++;
+        const result = await this.sendSms(sub.phone, message);
+        if (result.sent) smsDelivered++;
+      }
+    }
+
+    await repo.setPublished(this.db, alertId, userId, { recipients, smsAttempted, smsDelivered });
     await this.audit?.record({
       actorId: userId,
       action: 'alert.published',
       resourceType: 'alert',
       resourceId: alertId,
       placeId: alert.place_id,
-      metadata: { severity: alert.severity, recipients },
+      metadata: { severity: alert.severity, recipients, smsAttempted, smsDelivered },
     });
 
     return (await repo.getAlert(this.db, alertId)) as AlertRow;

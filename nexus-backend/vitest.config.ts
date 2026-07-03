@@ -8,6 +8,11 @@ export default defineConfig({
     // DB-gated integration tests are network-bound (Neon); allow generous timeouts.
     testTimeout: 25000,
     hookTimeout: 40000,
+    // Integration tests share fixtures (e.g. the "Northern" region/"Tolon" district demo
+    // data) and mutate shared subscriber/notification rows. Running test FILES in parallel
+    // lets one file's temporary subscriptions leak into another's subscriber-count
+    // assertions. Serialize files to keep DB-gated tests deterministic.
+    fileParallelism: false,
   },
   resolve: {
     alias: {

@@ -19,12 +19,15 @@ export interface AlertRow {
   area_desc: string | null;
   status: string;
   recipients: number;
+  sms_attempted: number;
+  sms_delivered: number;
   published_at: string | null;
   created_at: string;
 }
 
 const COLS = sql`id, hazard_event_id, place_id, category, event_type, severity, urgency, certainty,
-  headline, description, instruction, area_desc, status, recipients, published_at, created_at`;
+  headline, description, instruction, area_desc, status, recipients, sms_attempted, sms_delivered,
+  published_at, created_at`;
 
 /** Event + hazard-type + place details needed to draft an alert. */
 export interface EventForAlert {
@@ -98,10 +101,16 @@ export async function listAlerts(db: Db, f: { status?: string; limit?: number })
   return r.rows as unknown as AlertRow[];
 }
 
-export async function setPublished(db: Db, id: string, userId: string, recipients: number): Promise<void> {
+export async function setPublished(
+  db: Db,
+  id: string,
+  userId: string,
+  counts: { recipients: number; smsAttempted: number; smsDelivered: number },
+): Promise<void> {
   await db.execute(sql`
     UPDATE warnings SET status = 'published', published_by = ${userId}, published_at = now(),
-      recipients = ${recipients}, updated_at = now()
+      recipients = ${counts.recipients}, sms_attempted = ${counts.smsAttempted}, sms_delivered = ${counts.smsDelivered},
+      updated_at = now()
     WHERE id = ${id}
   `);
 }
@@ -113,4 +122,23 @@ export async function findSubscribers(db: Db, placePath: string): Promise<string
     WHERE p.path <@ ${placePath}::ltree OR ${placePath}::ltree <@ p.path
   `);
   return (r.rows as unknown as { user_id: string }[]).map((x) => x.user_id);
+}
+
+/**
+ * Subscribers who opted into SMS for the affected area and have a phone number.
+ * Preference absence = enabled (opt-out model): only an explicit sms=false row excludes them.
+ */
+export async function findSmsSubscribers(db: Db, placePath: string): Promise<{ userId: string; phone: string }[]> {
+  const r = await db.execute(sql`
+    SELECT DISTINCT u.id AS user_id, u.phone
+    FROM subscriptions s
+    JOIN places p ON s.place_id = p.id
+    JOIN users u ON u.id = s.user_id
+    LEFT JOIN notification_preferences np ON np.user_id = s.user_id AND np.channel = 'sms'
+    WHERE (p.path <@ ${placePath}::ltree OR ${placePath}::ltree <@ p.path)
+      AND 'sms' = ANY(s.channels)
+      AND u.phone IS NOT NULL
+      AND (np.enabled IS DISTINCT FROM false)
+  `);
+  return (r.rows as unknown as { user_id: string; phone: string }[]).map((x) => ({ userId: x.user_id, phone: x.phone }));
 }
