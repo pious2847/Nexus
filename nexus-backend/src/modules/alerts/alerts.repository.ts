@@ -1,0 +1,116 @@
+/**
+ * Data access for alerts + the subscriber lookup used for fan-out.
+ */
+import { sql } from 'drizzle-orm';
+import type { Db } from '../../shared/db';
+
+export interface AlertRow {
+  id: string;
+  hazard_event_id: string | null;
+  place_id: string | null;
+  category: string;
+  event_type: string;
+  severity: string;
+  urgency: string;
+  certainty: string;
+  headline: string;
+  description: string | null;
+  instruction: string | null;
+  area_desc: string | null;
+  status: string;
+  recipients: number;
+  published_at: string | null;
+  created_at: string;
+}
+
+const COLS = sql`id, hazard_event_id, place_id, category, event_type, severity, urgency, certainty,
+  headline, description, instruction, area_desc, status, recipients, published_at, created_at`;
+
+/** Event + hazard-type + place details needed to draft an alert. */
+export interface EventForAlert {
+  hazard_type: string;
+  category: string;
+  label: string;
+  place_id: string | null;
+  place_name: string | null;
+  place_path: string | null;
+  severity: string | null;
+  urgency: string | null;
+  certainty: string | null;
+  title: string;
+}
+
+export async function getEventForAlert(db: Db, eventId: string): Promise<EventForAlert | null> {
+  const r = await db.execute(sql`
+    SELECT e.hazard_type, ht.category, ht.label, e.place_id,
+           p.name AS place_name, p.path::text AS place_path,
+           e.severity, e.urgency, e.certainty, e.title
+    FROM hazard_events e
+    JOIN hazard_types ht ON e.hazard_type = ht.code
+    LEFT JOIN places p ON e.place_id = p.id
+    WHERE e.id = ${eventId}
+  `);
+  return (r.rows[0] as unknown as EventForAlert) ?? null;
+}
+
+export async function placePathById(db: Db, placeId: string): Promise<string | null> {
+  const r = await db.execute(sql`SELECT path::text AS path FROM places WHERE id = ${placeId}`);
+  return (r.rows[0] as { path: string } | undefined)?.path ?? null;
+}
+
+export interface InsertAlertInput {
+  hazardEventId?: string | null;
+  placeId?: string | null;
+  category: string;
+  eventType: string;
+  severity: string;
+  urgency: string;
+  certainty: string;
+  headline: string;
+  description?: string | null;
+  instruction?: string | null;
+  areaDesc?: string | null;
+  createdBy?: string | null;
+}
+
+export async function insertAlert(db: Db, a: InsertAlertInput): Promise<AlertRow> {
+  const r = await db.execute(sql`
+    INSERT INTO warnings (hazard_event_id, place_id, category, event_type, severity, urgency, certainty,
+      headline, description, instruction, area_desc, created_by)
+    VALUES (${a.hazardEventId ?? null}, ${a.placeId ?? null}, ${a.category}, ${a.eventType}, ${a.severity},
+      ${a.urgency}, ${a.certainty}, ${a.headline}, ${a.description ?? null}, ${a.instruction ?? null},
+      ${a.areaDesc ?? null}, ${a.createdBy ?? null})
+    RETURNING ${COLS}
+  `);
+  return r.rows[0] as unknown as AlertRow;
+}
+
+export async function getAlert(db: Db, id: string): Promise<AlertRow | null> {
+  const r = await db.execute(sql`SELECT ${COLS} FROM warnings WHERE id = ${id}`);
+  return (r.rows[0] as unknown as AlertRow) ?? null;
+}
+
+export async function listAlerts(db: Db, f: { status?: string; limit?: number }): Promise<AlertRow[]> {
+  const conds = [sql`TRUE`];
+  if (f.status) conds.push(sql`status = ${f.status}`);
+  const where = sql.join(conds, sql` AND `);
+  const r = await db.execute(sql`SELECT ${COLS} FROM warnings WHERE ${where} ORDER BY created_at DESC LIMIT ${f.limit ?? 50}`);
+  return r.rows as unknown as AlertRow[];
+}
+
+export async function setPublished(db: Db, id: string, userId: string, recipients: number): Promise<void> {
+  await db.execute(sql`
+    UPDATE warnings SET status = 'published', published_by = ${userId}, published_at = now(),
+      recipients = ${recipients}, updated_at = now()
+    WHERE id = ${id}
+  `);
+}
+
+/** Users to notify for an alert area: subscribers whose place shares lineage with the area. */
+export async function findSubscribers(db: Db, placePath: string): Promise<string[]> {
+  const r = await db.execute(sql`
+    SELECT DISTINCT s.user_id FROM subscriptions s JOIN places p ON s.place_id = p.id
+    WHERE p.path <@ ${placePath}::ltree OR ${placePath}::ltree <@ p.path
+  `);
+  return (r.rows as unknown as { user_id: string }[]).map((x) => x.user_id);
+}

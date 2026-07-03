@@ -39,7 +39,18 @@ pnpm --filter nexus-backend seed:hazard-types
   wired into boot in `core/http/register.ts`. **Opt-in**: set `ENABLE_HAZARD_JOBS=true`
   (off by default so dev/test boots don't auto-write). Overlap-guarded; errors are swallowed.
 
+## Impact-based forecasting (`impact.ts`)
+When an event is raised (`HazardService.raiseEvent`), we compute who/what is in the affected
+area over the geography **subtree** (ltree `<@`) and store it in `hazard_events.impact_summary`:
+population + exposed facilities (schools, toilets, sanitation units, waste facilities, dump
+sites), plus `districtsInScope`. A region event therefore counts across all its districts.
+`summarizeImpact()` renders the one-liner ("~2.3M people · 3 schools, 5 toilets across 16
+districts"). Impact failures never block event creation.
+- District-level **population** is a pending data task (regions have it today).
+- Facility counts come from geo-tagged `place_id` — run `backfill:place-id` for legacy data.
+
 ## What's next (later Phase 1 increments)
-- More evaluators + sources: **GloFAS** (floods), **CHIRPS** (drought); nationwide weather ingestion.
-- Risk-knowledge layer (`risk_zones`, `risk_profiles`) + impact-based forecasting.
+- More evaluators + sources: **GloFAS** (floods), **CHIRPS** (drought).
+- Risk-knowledge layer (`risk_zones`, `risk_profiles`); health-facility registry (Module D)
+  to enrich impact with clinics.
 - Tiered warning authority + approval queue (`warning_approvals`), then alert delivery (Module F).

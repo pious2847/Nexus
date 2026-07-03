@@ -12,6 +12,7 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { HazardService } from '../../modules/hazards/hazards.service';
 import { ReportsService } from '../../modules/reports/reports.service';
+import { AlertsService } from '../../modules/alerts/alerts.service';
 
 export interface CoreServices {
   db: Db;
@@ -22,6 +23,7 @@ export interface CoreServices {
   notifications: NotificationsService;
   hazards: HazardService;
   reports: ReportsService;
+  alerts: AlertsService;
 }
 
 export function createCoreServices(pool: Pool): CoreServices {
@@ -29,14 +31,17 @@ export function createCoreServices(pool: Pool): CoreServices {
   const audit = new AuditService(db);
   const geography = new GeographyService(db);
   const hazards = new HazardService(db, audit);
+  const rbac = new RbacService(db);
+  const notifications = new NotificationsService(db);
   return {
     db,
     audit,
     geography,
     hazards,
+    rbac,
+    notifications,
     auth: new AuthService(db, process.env.JWT_SECRET ?? '', undefined, audit),
-    rbac: new RbacService(db),
-    notifications: new NotificationsService(db),
     reports: new ReportsService(db, geography, hazards, audit),
+    alerts: new AlertsService(db, rbac, notifications, audit),
   };
 }

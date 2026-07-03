@@ -10,6 +10,7 @@ import type { AuditRecorder } from '../../core/audit/audit.service';
 import * as repo from './hazards.repository';
 import type { CreateEventInput, HazardEvent } from './hazards.repository';
 import { assertTransition, isTerminal } from './hazards.state';
+import { computeImpact } from './impact';
 
 export interface RaiseEventInput {
   hazardType: string;
@@ -73,6 +74,21 @@ export class HazardService {
     };
     const event = await repo.insertEvent(this.db, create);
     await repo.insertTransition(this.db, { eventId: event.id, fromState: null, toState: state, actorId, reason: 'created' });
+
+    // Impact-based forecasting: who/what is in the affected area (spec 01 §9).
+    // Never let an impact failure block event creation.
+    if (event.place_id) {
+      try {
+        const impact = await computeImpact(this.db, event.place_id);
+        if (impact) {
+          await repo.updateEventImpact(this.db, event.id, impact);
+          event.impact_summary = impact;
+        }
+      } catch (err) {
+        console.error('[impact] compute failed for event', event.id, (err as Error).message);
+      }
+    }
+
     await this.audit?.record({
       actorId: actorId ?? null,
       action: 'hazard.event.created',

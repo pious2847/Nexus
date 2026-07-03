@@ -137,6 +137,12 @@ export async function findOpenAutoEvent(
   return (r.rows[0] as unknown as HazardEvent) ?? null;
 }
 
+export async function updateEventImpact(db: Db, id: string, impact: unknown): Promise<void> {
+  await db.execute(sql`
+    UPDATE hazard_events SET impact_summary = ${JSON.stringify(impact)}::jsonb, updated_at = now() WHERE id = ${id}
+  `);
+}
+
 export async function getEventPlacePath(db: Db, eventId: string): Promise<string | null> {
   const r = await db.execute(sql`
     SELECT p.path::text AS path FROM hazard_events e JOIN places p ON e.place_id = p.id WHERE e.id = ${eventId}

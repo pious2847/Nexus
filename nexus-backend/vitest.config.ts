@@ -5,6 +5,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
+    // DB-gated integration tests are network-bound (Neon); allow generous timeouts.
+    testTimeout: 25000,
+    hookTimeout: 40000,
   },
   resolve: {
     alias: {
