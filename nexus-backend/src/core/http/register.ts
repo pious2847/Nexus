@@ -10,6 +10,7 @@ import { buildGeographyRouter } from '../geography/geography.routes';
 import { buildHazardsRouter } from '../../modules/hazards/hazards.routes';
 import { buildReportsRouter } from '../../modules/reports/reports.routes';
 import { buildAlertsRouter } from '../../modules/alerts/alerts.routes';
+import { buildNotificationsRouter } from '../notifications/notifications.routes';
 import { startHazardJobs } from '../../modules/hazards/hazards.jobs';
 
 export function registerCoreRoutes(app: Express): void {
@@ -24,8 +25,9 @@ export function registerCoreRoutes(app: Express): void {
   app.use('/api/v1/incident-reports', buildReportsRouter(services));
   // Mounted at /warnings to avoid the legacy /alerts (sensor/flood alerts) route.
   app.use('/api/v1/warnings', buildAlertsRouter(services));
+  app.use('/api/v1/notifications', buildNotificationsRouter(services));
 
-  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings (TypeScript)');
+  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications (TypeScript)');
 
   // Scheduled hazard evaluators (opt-in via ENABLE_HAZARD_JOBS).
   startHazardJobs({ db: services.db, hazards: services.hazards, geography: services.geography });
