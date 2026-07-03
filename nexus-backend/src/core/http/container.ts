@@ -11,6 +11,7 @@ import { GeographyService } from '../geography/geography.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { HazardService } from '../../modules/hazards/hazards.service';
+import { ReportsService } from '../../modules/reports/reports.service';
 
 export interface CoreServices {
   db: Db;
@@ -20,18 +21,22 @@ export interface CoreServices {
   audit: AuditService;
   notifications: NotificationsService;
   hazards: HazardService;
+  reports: ReportsService;
 }
 
 export function createCoreServices(pool: Pool): CoreServices {
   const db = drizzle(pool);
   const audit = new AuditService(db);
+  const geography = new GeographyService(db);
+  const hazards = new HazardService(db, audit);
   return {
     db,
     audit,
+    geography,
+    hazards,
     auth: new AuthService(db, process.env.JWT_SECRET ?? '', undefined, audit),
     rbac: new RbacService(db),
-    geography: new GeographyService(db),
     notifications: new NotificationsService(db),
-    hazards: new HazardService(db, audit),
+    reports: new ReportsService(db, geography, hazards, audit),
   };
 }

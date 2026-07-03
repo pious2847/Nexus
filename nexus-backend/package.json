@@ -11,6 +11,8 @@
     "seed:rbac": "tsx src/core/rbac/seed-rbac.ts",
     "backfill:place-id": "tsx src/modules/sanitation/backfill-place-id.ts",
     "seed:hazard-types": "tsx src/modules/hazards/seed-hazard-types.ts",
+    "ingest:firms": "tsx src/modules/hazards/ingest-firms.ts",
+    "ingest:rainfall": "tsx src/modules/hazards/ingest-rainfall.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

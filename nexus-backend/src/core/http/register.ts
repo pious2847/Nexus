@@ -8,6 +8,8 @@ import { createCoreServices } from './container';
 import { buildAuthRouter } from '../auth/auth.routes';
 import { buildGeographyRouter } from '../geography/geography.routes';
 import { buildHazardsRouter } from '../../modules/hazards/hazards.routes';
+import { buildReportsRouter } from '../../modules/reports/reports.routes';
+import { startHazardJobs } from '../../modules/hazards/hazards.jobs';
 
 export function registerCoreRoutes(app: Express): void {
   // Reuse the legacy app's pg Pool so we don't open a second connection pool.
@@ -17,6 +19,11 @@ export function registerCoreRoutes(app: Express): void {
   app.use('/api/v1/auth-v2', buildAuthRouter(services));
   app.use('/api/v1/geography', buildGeographyRouter(services));
   app.use('/api/v1/hazards', buildHazardsRouter(services));
+  // Mounted at /incident-reports to avoid the legacy /reports (community reports) route.
+  app.use('/api/v1/incident-reports', buildReportsRouter(services));
 
-  console.log('[core] mounted /api/v1/auth-v2, /api/v1/geography, /api/v1/hazards (TypeScript)');
+  console.log('[core] mounted auth-v2, geography, hazards, incident-reports (TypeScript)');
+
+  // Scheduled hazard evaluators (opt-in via ENABLE_HAZARD_JOBS).
+  startHazardJobs({ db: services.db, hazards: services.hazards, geography: services.geography });
 }

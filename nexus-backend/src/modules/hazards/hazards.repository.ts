@@ -121,6 +121,22 @@ export async function updateEventState(
   `);
 }
 
+/** Find an open (non-closed) auto-raised event for a place within a recent window (dedup). */
+export async function findOpenAutoEvent(
+  db: Db,
+  hazardType: string,
+  placeId: string,
+  withinHours: number,
+): Promise<HazardEvent | null> {
+  const r = await db.execute(sql`
+    SELECT ${EVENT_COLS} FROM hazard_events
+    WHERE hazard_type = ${hazardType} AND place_id = ${placeId} AND source = 'auto'
+      AND state <> 'closed' AND created_at > now() - make_interval(hours => ${withinHours})
+    ORDER BY created_at DESC LIMIT 1
+  `);
+  return (r.rows[0] as unknown as HazardEvent) ?? null;
+}
+
 export async function getEventPlacePath(db: Db, eventId: string): Promise<string | null> {
   const r = await db.execute(sql`
     SELECT p.path::text AS path FROM hazard_events e JOIN places p ON e.place_id = p.id WHERE e.id = ${eventId}

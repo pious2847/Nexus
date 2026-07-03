@@ -50,6 +50,13 @@
       "when": 1751932800000,
       "tag": "0006_hazards",
       "breakpoints": false
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1752019200000,
+      "tag": "0007_incident_reports",
+      "breakpoints": false
     }
   ]
 }
