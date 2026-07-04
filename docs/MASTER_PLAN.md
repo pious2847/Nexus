@@ -553,7 +553,7 @@ Each phase is shippable and demoable on its own.
 
 ### Phase 1 — Multi-hazard core + nationwide  → **status as of 2026-07-04 (honest checklist)**
 > **Agreed sequencing (2026-07-03):** finish remaining Phase 1 gaps in order — drought ✅ →
-> GloFAS (floods) → national multi-hazard map → vulnerable-persons registry (N4) → citizen
+> GloFAS (floods) ✅ → national multi-hazard map → vulnerable-persons registry (N4) → citizen
 > PWA/SMS intake — before returning to Phase 2.
 - [x] Hazard registry + event lifecycle (config-driven, CAP-classified, state machine)
 - [x] Generalize flood logic (generic evaluator pattern — any hazard is a config row + evaluator)
@@ -562,8 +562,14 @@ Each phase is shippable and demoable on its own.
       normal (Open-Meteo historical archive, no key); real result found — "Drought watch —
       Upper West" (55.9% deficit). True CHIRPS climatology remains a future upgrade.
 - [x] FIRMS (bushfire) — live-verified, scheduled
-- [ ] **GloFAS (floods)** — not started ← **next**
-- [ ] **Nationwide weather module / national multi-hazard map** — not started (no map endpoints, no frontend)
+- [x] **GloFAS (floods)** — live-verified 2026-07-04: forecast river discharge vs. 10-year
+      daily-percentile thresholds (GloFAS v4 data via Open-Meteo's Flood API, no key — avoids
+      the raw CDS/netCDF/Python path originally anticipated). Real result: **5 flood watches,
+      all in southern/coastal Ghana** (Greater Accra, Ashanti, Central, Eastern, Western) —
+      geographically coherent with July's rainy-season belt, while the drought hit was in the
+      north (Upper West) — independent cross-validation that both evaluators are tracking real
+      signal. Daily-percentile proxy for GloFAS's own return-period levels (future upgrade).
+- [ ] **Nationwide weather module / national multi-hazard map** — not started (no map endpoints, no frontend) ← **next**
 - [x] Citizen incident reporting + verification workflow — **backend only**
 - [ ] **Citizen reporting via PWA / SMS / WhatsApp** — not started (API only; no frontend at all yet, no SMS keyword intake)
 - [ ] **Life-safety Tier 1 start: vulnerable-persons registry (N4)** — not started

@@ -36,14 +36,22 @@ pnpm --filter nexus-backend seed:hazard-types
   `drought` events on deficit ≥40% (`classifyDrought`/`deficitPercent`/`sumWindow`, pure + tested).
   Slow-onset: `urgency: 'future'`, `certainty: 'likely'`, weekly cadence. True CHIRPS climatology
   is a future upgrade (spec 01 §17) — this is an honest v1 heuristic, not a stand-in for it.
+- `evaluators/flood.ts` — **GloFAS** river discharge (spec 01 §7 lists `glofas` as a flood
+  source), served as free no-key JSON by Open-Meteo's Flood API (wraps GloFAS v4, 5km, 1984→
+  present) — avoids the raw CDS/netCDF path the original research flagged as needing a Python
+  worker. Compares forecast max discharge (7 days) to historical daily-discharge percentiles
+  (p90/p95/p98 over a 10-year record) at the same point, raises **auto** `flood` events
+  (`percentile`/`classifyFloodRisk`, pure + tested). This is a **daily-percentile proxy** for
+  GloFAS's own return-period alert levels (which use annual maxima) — an honest v1 heuristic,
+  not a claim of methodological equivalence. Adapter: `src/integrations/glofas.ts`.
 
 ## Ingestion + scheduling
-- Reusable fns in `ingestion.ts` (`ingestFirms`, `ingestRainfall`, `ingestDrought`); manual CLIs:
-  `pnpm ingest:firms`, `pnpm ingest:rainfall`, `pnpm ingest:drought`.
-- `hazards.jobs.ts` — `startHazardJobs()` schedules all three via node-cron (**FIRMS 3h, rainfall
-  6h, drought weekly Mon 04:00**), wired into boot in `core/http/register.ts`. **Opt-in**: set
-  `ENABLE_HAZARD_JOBS=true` (off by default so dev/test boots don't auto-write). Overlap-guarded;
-  errors are swallowed.
+- Reusable fns in `ingestion.ts` (`ingestFirms`, `ingestRainfall`, `ingestDrought`, `ingestFlood`);
+  manual CLIs: `pnpm ingest:firms`, `pnpm ingest:rainfall`, `pnpm ingest:drought`, `pnpm ingest:flood`.
+- `hazards.jobs.ts` — `startHazardJobs()` schedules all four via node-cron (**FIRMS 3h, rainfall
+  6h, flood 12h, drought weekly Mon 04:00**), wired into boot in `core/http/register.ts`.
+  **Opt-in**: set `ENABLE_HAZARD_JOBS=true` (off by default so dev/test boots don't auto-write).
+  Overlap-guarded; errors are swallowed.
 
 ## Impact-based forecasting (`impact.ts`)
 When an event is raised (`HazardService.raiseEvent`), we compute who/what is in the affected
@@ -56,7 +64,6 @@ districts"). Impact failures never block event creation.
 - Facility counts come from geo-tagged `place_id` — run `backfill:place-id` for legacy data.
 
 ## What's next (remaining Phase 1 gaps — see MASTER_PLAN §11)
-- **GloFAS** flood evaluator (river discharge forecasts).
 - National multi-hazard map (backend endpoints for the frontend to consume).
 - Vulnerable-persons registry (N4) — the first Module N life-safety feature.
 - Citizen reporting via PWA / SMS keyword intake (currently API-only).

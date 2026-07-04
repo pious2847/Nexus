@@ -10,6 +10,7 @@ import { fetchActiveFires } from '../../integrations/firms';
 import { BushfireEvaluator, type IngestSummary } from './evaluators/bushfire';
 import { RainfallEvaluator, type RainfallSummary, type RainfallTarget } from './evaluators/rainfall';
 import { DroughtEvaluator, type DroughtSummary, type DroughtTarget } from './evaluators/drought';
+import { FloodEvaluator, type FloodSummary, type FloodTarget } from './evaluators/flood';
 
 export interface IngestDeps {
   db: Db;
@@ -44,4 +45,10 @@ export async function ingestRainfall(deps: IngestDeps): Promise<RainfallSummary>
 export async function ingestDrought(deps: IngestDeps): Promise<DroughtSummary> {
   const targets: DroughtTarget[] = await getRainfallTargets(deps.db); // same region-centroid targets
   return new DroughtEvaluator({ db: deps.db, hazards: deps.hazards }).run(targets);
+}
+
+/** Evaluate forecast river discharge (GloFAS via Open-Meteo) per region and raise/update flood events. */
+export async function ingestFlood(deps: IngestDeps): Promise<FloodSummary> {
+  const targets: FloodTarget[] = await getRainfallTargets(deps.db); // same region-centroid targets
+  return new FloodEvaluator({ db: deps.db, hazards: deps.hazards }).run(targets);
 }

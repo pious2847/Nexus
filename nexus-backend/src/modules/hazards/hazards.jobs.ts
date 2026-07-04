@@ -4,7 +4,7 @@
  * Each job is guarded against overlap and never throws out of the tick.
  */
 import type { IngestDeps } from './ingestion';
-import { ingestFirms, ingestRainfall, ingestDrought } from './ingestion';
+import { ingestFirms, ingestRainfall, ingestDrought, ingestFlood } from './ingestion';
 
 // node-cron is untyped here; require with a minimal signature.
 const cron = require('node-cron') as {
@@ -36,12 +36,15 @@ export function startHazardJobs(deps: IngestDeps): void {
   let firmsBusy = false;
   let rainBusy = false;
   let droughtBusy = false;
+  let floodBusy = false;
 
-  // FIRMS every 3h (matches its ~3h data latency); rainfall every 6h;
-  // drought weekly (slow-onset, spec 01 §3.5 — no need for frequent re-evaluation).
+  // FIRMS every 3h (matches its ~3h data latency); rainfall every 6h; flood (river
+  // discharge) every 12h (slower-changing than rainfall); drought weekly (slow-onset,
+  // spec 01 §3.5 — no need for frequent re-evaluation).
   cron.schedule('0 */3 * * *', guarded('firms', () => firmsBusy, (v) => (firmsBusy = v), () => ingestFirms(deps)));
   cron.schedule('30 */6 * * *', guarded('rainfall', () => rainBusy, (v) => (rainBusy = v), () => ingestRainfall(deps)));
+  cron.schedule('15 */12 * * *', guarded('flood', () => floodBusy, (v) => (floodBusy = v), () => ingestFlood(deps)));
   cron.schedule('0 4 * * 1', guarded('drought', () => droughtBusy, (v) => (droughtBusy = v), () => ingestDrought(deps)));
 
-  console.log('[jobs] hazard evaluators scheduled — FIRMS every 3h, rainfall every 6h, drought weekly (Mon 04:00)');
+  console.log('[jobs] hazard evaluators scheduled — FIRMS 3h, rainfall 6h, flood 12h, drought weekly (Mon 04:00)');
 }

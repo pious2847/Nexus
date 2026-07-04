@@ -14,6 +14,7 @@
     "ingest:firms": "tsx src/modules/hazards/ingest-firms.ts",
     "ingest:rainfall": "tsx src/modules/hazards/ingest-rainfall.ts",
     "ingest:drought": "tsx src/modules/hazards/ingest-drought.ts",
+    "ingest:flood": "tsx src/modules/hazards/ingest-flood.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
