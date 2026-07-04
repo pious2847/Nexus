@@ -9,6 +9,7 @@ import type { HazardService } from './hazards.service';
 import { fetchActiveFires } from '../../integrations/firms';
 import { BushfireEvaluator, type IngestSummary } from './evaluators/bushfire';
 import { RainfallEvaluator, type RainfallSummary, type RainfallTarget } from './evaluators/rainfall';
+import { DroughtEvaluator, type DroughtSummary, type DroughtTarget } from './evaluators/drought';
 
 export interface IngestDeps {
   db: Db;
@@ -37,4 +38,10 @@ export async function getRainfallTargets(db: Db): Promise<RainfallTarget[]> {
 export async function ingestRainfall(deps: IngestDeps): Promise<RainfallSummary> {
   const targets = await getRainfallTargets(deps.db);
   return new RainfallEvaluator({ db: deps.db, hazards: deps.hazards }).run(targets);
+}
+
+/** Evaluate rainfall deficit (vs. a multi-year normal) per region and raise/update drought events. */
+export async function ingestDrought(deps: IngestDeps): Promise<DroughtSummary> {
+  const targets: DroughtTarget[] = await getRainfallTargets(deps.db); // same region-centroid targets
+  return new DroughtEvaluator({ db: deps.db, hazards: deps.hazards }).run(targets);
 }

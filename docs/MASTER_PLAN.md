@@ -551,17 +551,41 @@ Each phase is shippable and demoable on its own.
 > **resilient/degraded-mode operation (N8)** and **guaranteed, acknowledged delivery (N9)** —
 > these are reliability requirements, not later features.
 
-### Phase 1 — Multi-hazard core + nationwide
-- Hazard registry + event lifecycle; generalize flood logic; add heavy-rainfall & drought monitoring.
-- External sources: FIRMS (bushfire, easy Node win) → GloFAS (floods) → CHIRPS (drought); nationwide weather; national multi-hazard map.
-- Citizen incident reporting + verification workflow (PWA + SMS/WhatsApp).
-- **Life-safety (Module N, Tier 1 start):** vulnerable-persons registry (N4).
+### Phase 1 — Multi-hazard core + nationwide  → **status as of 2026-07-04 (honest checklist)**
+> **Agreed sequencing (2026-07-03):** finish remaining Phase 1 gaps in order — drought ✅ →
+> GloFAS (floods) → national multi-hazard map → vulnerable-persons registry (N4) → citizen
+> PWA/SMS intake — before returning to Phase 2.
+- [x] Hazard registry + event lifecycle (config-driven, CAP-classified, state machine)
+- [x] Generalize flood logic (generic evaluator pattern — any hazard is a config row + evaluator)
+- [x] Heavy-rainfall monitoring (Open-Meteo, live-verified)
+- [x] **Drought monitoring** — live-verified 2026-07-04: 30-day rainfall vs. a 3-year rolling
+      normal (Open-Meteo historical archive, no key); real result found — "Drought watch —
+      Upper West" (55.9% deficit). True CHIRPS climatology remains a future upgrade.
+- [x] FIRMS (bushfire) — live-verified, scheduled
+- [ ] **GloFAS (floods)** — not started ← **next**
+- [ ] **Nationwide weather module / national multi-hazard map** — not started (no map endpoints, no frontend)
+- [x] Citizen incident reporting + verification workflow — **backend only**
+- [ ] **Citizen reporting via PWA / SMS / WhatsApp** — not started (API only; no frontend at all yet, no SMS keyword intake)
+- [ ] **Life-safety Tier 1 start: vulnerable-persons registry (N4)** — not started
 
-### Phase 2 — Alerts, health & citizen engagement
-- CAP alerts + geo-targeted multi-channel broadcasts + subscriptions, **with guaranteed/acknowledged delivery (N9), signed alerts (N10), and last-mile community/radio channels (N6)**.
-- **"I'm Safe" check-in (N1)** + SOS (N2) tied to active events.
-- Disease surveillance module (case reporting, outbreak detection).
-- Bushfire risk; PWA offline-first hardening (**degraded-mode, N8**); i18n (first local languages).
+> **⚠️ Sequencing note:** development did **not** follow this phase order. We built one
+> hazard vertically end-to-end (detect → classify → impact → CAP warning → tiered publish →
+> in-app + SMS fan-out) to prove the whole architecture, which pulled in **Phase 2 items**
+> (CAP alerts, N9 guaranteed delivery/SMS) before Phase 1 was finished. That was a deliberate
+> engineering choice (prove one thread fully before going broad) but it was never reconciled
+> back against this document until 2026-07-03. Treat the checkboxes above, not the prose
+> below, as the source of truth for what's actually built.
+
+### Phase 2 — Alerts, health & citizen engagement  → **partially pulled forward into Phase 1 (see note above)**
+- [x] CAP alerts + tiered publish authority + subscriptions
+- [x] SMS fan-out (**N9** guaranteed-delivery groundwork — in-app + SMS; push/WhatsApp/voice still open)
+- [ ] Geo-targeted **multi-channel** broadcasts (push, WhatsApp, voice) — SMS only so far
+- [ ] Signed alerts (**N10**)
+- [ ] Last-mile community/radio channels (**N6**)
+- [ ] **"I'm Safe" check-in (N1)** + SOS (N2) tied to active events
+- [ ] Disease surveillance module (case reporting, outbreak detection)
+- [ ] PWA offline-first hardening (**degraded-mode, N8**)
+- [ ] i18n (first local languages)
 
 ### Phase 3 — Data Hub + ML service
 - Dataset catalog, public/by-request/private sharing, data-request workflow, public API, licensing, anonymization.

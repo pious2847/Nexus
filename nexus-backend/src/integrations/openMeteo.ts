@@ -40,3 +40,23 @@ export async function fetchDailyPrecip(lat: number, lng: number, forecastDays = 
   });
   return parseDailyPrecip(res.data);
 }
+
+/**
+ * Fetch OBSERVED daily precipitation for a date range (free, no key — Open-Meteo's
+ * historical archive, reanalysis-based). Used for drought detection: current rainfall
+ * vs. a rolling multi-year "normal" (true CHIRPS climatology is a future upgrade —
+ * see spec 01 §17). Dates are 'YYYY-MM-DD'.
+ */
+export async function fetchHistoricalDailyPrecip(
+  lat: number,
+  lng: number,
+  startDate: string,
+  endDate: string,
+): Promise<PrecipForecast> {
+  const url = 'https://archive-api.open-meteo.com/v1/archive';
+  const res = await axios.get(url, {
+    params: { latitude: lat, longitude: lng, start_date: startDate, end_date: endDate, daily: 'precipitation_sum', timezone: 'auto' },
+    timeout: 20000,
+  });
+  return parseDailyPrecip(res.data);
+}

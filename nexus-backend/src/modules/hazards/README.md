@@ -31,13 +31,19 @@ pnpm --filter nexus-backend seed:hazard-types
   open auto event per district / 24h. Adapter: `src/integrations/firms.ts` (needs `FIRMS_MAP_KEY`).
 - `evaluators/rainfall.ts` — **Open-Meteo** (no key) forecast precipitation → **auto**
   `heavy_rainfall` events (`classifyRainfall`, pure + tested). Adapter: `src/integrations/openMeteo.ts`.
+- `evaluators/drought.ts` — **Open-Meteo historical archive** (no key) — compares the current
+  30-day rainfall to a 3-year rolling "normal" for the same calendar window, raises **auto**
+  `drought` events on deficit ≥40% (`classifyDrought`/`deficitPercent`/`sumWindow`, pure + tested).
+  Slow-onset: `urgency: 'future'`, `certainty: 'likely'`, weekly cadence. True CHIRPS climatology
+  is a future upgrade (spec 01 §17) — this is an honest v1 heuristic, not a stand-in for it.
 
 ## Ingestion + scheduling
-- Reusable fns in `ingestion.ts` (`ingestFirms`, `ingestRainfall`); manual CLIs:
-  `pnpm ingest:firms`, `pnpm ingest:rainfall`.
-- `hazards.jobs.ts` — `startHazardJobs()` schedules both via node-cron (**FIRMS 3h, rainfall 6h**),
-  wired into boot in `core/http/register.ts`. **Opt-in**: set `ENABLE_HAZARD_JOBS=true`
-  (off by default so dev/test boots don't auto-write). Overlap-guarded; errors are swallowed.
+- Reusable fns in `ingestion.ts` (`ingestFirms`, `ingestRainfall`, `ingestDrought`); manual CLIs:
+  `pnpm ingest:firms`, `pnpm ingest:rainfall`, `pnpm ingest:drought`.
+- `hazards.jobs.ts` — `startHazardJobs()` schedules all three via node-cron (**FIRMS 3h, rainfall
+  6h, drought weekly Mon 04:00**), wired into boot in `core/http/register.ts`. **Opt-in**: set
+  `ENABLE_HAZARD_JOBS=true` (off by default so dev/test boots don't auto-write). Overlap-guarded;
+  errors are swallowed.
 
 ## Impact-based forecasting (`impact.ts`)
 When an event is raised (`HazardService.raiseEvent`), we compute who/what is in the affected
@@ -49,8 +55,10 @@ districts"). Impact failures never block event creation.
 - District-level **population** is a pending data task (regions have it today).
 - Facility counts come from geo-tagged `place_id` — run `backfill:place-id` for legacy data.
 
-## What's next (later Phase 1 increments)
-- More evaluators + sources: **GloFAS** (floods), **CHIRPS** (drought).
+## What's next (remaining Phase 1 gaps — see MASTER_PLAN §11)
+- **GloFAS** flood evaluator (river discharge forecasts).
+- National multi-hazard map (backend endpoints for the frontend to consume).
+- Vulnerable-persons registry (N4) — the first Module N life-safety feature.
+- Citizen reporting via PWA / SMS keyword intake (currently API-only).
 - Risk-knowledge layer (`risk_zones`, `risk_profiles`); health-facility registry (Module D)
   to enrich impact with clinics.
-- Tiered warning authority + approval queue (`warning_approvals`), then alert delivery (Module F).

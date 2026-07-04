@@ -13,6 +13,7 @@
     "seed:hazard-types": "tsx src/modules/hazards/seed-hazard-types.ts",
     "ingest:firms": "tsx src/modules/hazards/ingest-firms.ts",
     "ingest:rainfall": "tsx src/modules/hazards/ingest-rainfall.ts",
+    "ingest:drought": "tsx src/modules/hazards/ingest-drought.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
