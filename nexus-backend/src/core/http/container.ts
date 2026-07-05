@@ -14,6 +14,7 @@ import { HazardService } from '../../modules/hazards/hazards.service';
 import { ReportsService } from '../../modules/reports/reports.service';
 import { AlertsService } from '../../modules/alerts/alerts.service';
 import { HazardMapService } from '../../modules/hazards/hazardmap.service';
+import { VulnerablePersonsService } from '../../modules/vulnerable/vulnerable.service';
 
 export interface CoreServices {
   db: Db;
@@ -26,6 +27,7 @@ export interface CoreServices {
   reports: ReportsService;
   alerts: AlertsService;
   hazardMap: HazardMapService;
+  vulnerablePersons: VulnerablePersonsService;
 }
 
 export function createCoreServices(pool: Pool): CoreServices {
@@ -46,5 +48,6 @@ export function createCoreServices(pool: Pool): CoreServices {
     reports: new ReportsService(db, geography, hazards, audit),
     alerts: new AlertsService(db, rbac, notifications, audit),
     hazardMap: new HazardMapService(db),
+    vulnerablePersons: new VulnerablePersonsService(db, geography, audit),
   };
 }

@@ -71,6 +71,13 @@
       "when": 1752192000000,
       "tag": "0009_warnings_sms",
       "breakpoints": false
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1752278400000,
+      "tag": "0010_vulnerable_persons",
+      "breakpoints": false
     }
   ]
 }

@@ -553,7 +553,7 @@ Each phase is shippable and demoable on its own.
 
 ### Phase 1 — Multi-hazard core + nationwide  → **status as of 2026-07-04 (honest checklist)**
 > **Agreed sequencing (2026-07-03):** finish remaining Phase 1 gaps in order — drought ✅ →
-> GloFAS (floods) ✅ → national multi-hazard map ✅ → vulnerable-persons registry (N4) →
+> GloFAS (floods) ✅ → national multi-hazard map ✅ → vulnerable-persons registry (N4) ✅ →
 > citizen PWA/SMS intake — before returning to Phase 2.
 - [x] Hazard registry + event lifecycle (config-driven, CAP-classified, state machine)
 - [x] Generalize flood logic (generic evaluator pattern — any hazard is a config row + evaluator)
@@ -575,8 +575,15 @@ Each phase is shippable and demoable on its own.
       every district via ltree; on real data this correctly lit up **174 districts** across
       the affected regions from just 8 underlying events. Frontend rendering still pending.
 - [x] Citizen incident reporting + verification workflow — **backend only**
-- [ ] **Citizen reporting via PWA / SMS / WhatsApp** — not started (API only; no frontend at all yet, no SMS keyword intake)
-- [ ] **Life-safety Tier 1 start: vulnerable-persons registry (N4)** — not started ← **next**
+- [ ] **Citizen reporting via PWA / SMS / WhatsApp** — not started (API only; no frontend at all yet, no SMS keyword intake) ← **next**
+- [x] **Life-safety Tier 1 start: vulnerable-persons registry (N4)** — live-verified 2026-07-05:
+      `/api/v1/vulnerable-persons/*`, geo-scoped RBAC (no endpoint ever lists "everyone
+      nationally" — every list requires an explicit scope place, permission-checked against
+      it), explicit consent tracking, evacuation-priority sorting, every mutation audited.
+      Verified over HTTP: unauth→401, no-permission citizen→403, register→201, a
+      Greater-Accra-scoped list correctly excludes a Northern record (geo-isolation proven),
+      status update→200. `vulnerable.manage` restricted to district_officer+ (field workers
+      get create+read only — can't unilaterally mark someone deceased).
 
 > **⚠️ Sequencing note:** development did **not** follow this phase order. We built one
 > hazard vertically end-to-end (detect → classify → impact → CAP warning → tiered publish →
