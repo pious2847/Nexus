@@ -13,6 +13,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { HazardService } from '../../modules/hazards/hazards.service';
 import { ReportsService } from '../../modules/reports/reports.service';
 import { AlertsService } from '../../modules/alerts/alerts.service';
+import { HazardMapService } from '../../modules/hazards/hazardmap.service';
 
 export interface CoreServices {
   db: Db;
@@ -24,6 +25,7 @@ export interface CoreServices {
   hazards: HazardService;
   reports: ReportsService;
   alerts: AlertsService;
+  hazardMap: HazardMapService;
 }
 
 export function createCoreServices(pool: Pool): CoreServices {
@@ -43,5 +45,6 @@ export function createCoreServices(pool: Pool): CoreServices {
     auth: new AuthService(db, process.env.JWT_SECRET ?? '', undefined, audit),
     reports: new ReportsService(db, geography, hazards, audit),
     alerts: new AlertsService(db, rbac, notifications, audit),
+    hazardMap: new HazardMapService(db),
   };
 }

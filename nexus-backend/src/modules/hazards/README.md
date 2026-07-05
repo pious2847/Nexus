@@ -63,8 +63,22 @@ districts"). Impact failures never block event creation.
 - District-level **population** is a pending data task (regions have it today).
 - Facility counts come from geo-tagged `place_id` — run `backfill:place-id` for legacy data.
 
+## National multi-hazard map (`hazardmap.*`)
+Backend GeoJSON for a map frontend to consume (MASTER_PLAN Module H), mounted at
+`/api/v1/hazard-map` (distinct from the legacy `/api/v1/map` sanitation-asset layers):
+- `GET /hazard-map/events` — active hazard events as Features (event footprint, else place
+  boundary/centroid), filterable by `type`/`severity`/`region`.
+- `GET /hazard-map/districts` — a **risk choropleth**: every one of the 261 districts, colored
+  by its worst currently-active hazard, **aggregated up through the region hierarchy** (an
+  event raised at a region counts for every district inside it, via ltree `path <@`). Always
+  261 features — a district missing boundary geometry (currently just Guan, Oti — a tracked
+  Phase 0 follow-on) still appears with `geometry: null` + `hasGeometry: false` rather than
+  being silently dropped, so its risk status stays visible even before it can be drawn.
+- `GET /hazard-map/summary` — national active-event counts by hazard type/severity.
+`hazardmap.util.ts` (`severityRank`/`rankToSeverity`/`severityColor`/`buildFeature`) is pure
++ unit-tested; `hazardmap.repository.ts` holds the SQL; `hazardmap.service.ts` shapes GeoJSON.
+
 ## What's next (remaining Phase 1 gaps — see MASTER_PLAN §11)
-- National multi-hazard map (backend endpoints for the frontend to consume).
 - Vulnerable-persons registry (N4) — the first Module N life-safety feature.
 - Citizen reporting via PWA / SMS keyword intake (currently API-only).
 - Risk-knowledge layer (`risk_zones`, `risk_profiles`); health-facility registry (Module D)

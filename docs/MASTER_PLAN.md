@@ -553,8 +553,8 @@ Each phase is shippable and demoable on its own.
 
 ### Phase 1 — Multi-hazard core + nationwide  → **status as of 2026-07-04 (honest checklist)**
 > **Agreed sequencing (2026-07-03):** finish remaining Phase 1 gaps in order — drought ✅ →
-> GloFAS (floods) ✅ → national multi-hazard map → vulnerable-persons registry (N4) → citizen
-> PWA/SMS intake — before returning to Phase 2.
+> GloFAS (floods) ✅ → national multi-hazard map ✅ → vulnerable-persons registry (N4) →
+> citizen PWA/SMS intake — before returning to Phase 2.
 - [x] Hazard registry + event lifecycle (config-driven, CAP-classified, state machine)
 - [x] Generalize flood logic (generic evaluator pattern — any hazard is a config row + evaluator)
 - [x] Heavy-rainfall monitoring (Open-Meteo, live-verified)
@@ -569,10 +569,14 @@ Each phase is shippable and demoable on its own.
       geographically coherent with July's rainy-season belt, while the drought hit was in the
       north (Upper West) — independent cross-validation that both evaluators are tracking real
       signal. Daily-percentile proxy for GloFAS's own return-period levels (future upgrade).
-- [ ] **Nationwide weather module / national multi-hazard map** — not started (no map endpoints, no frontend) ← **next**
+- [x] **National multi-hazard map** — backend GeoJSON live-verified 2026-07-04:
+      `/api/v1/hazard-map/{events,districts,summary}` (mounted separately from the legacy
+      asset-layer `/api/v1/map`). District choropleth aggregates region-level events down to
+      every district via ltree; on real data this correctly lit up **174 districts** across
+      the affected regions from just 8 underlying events. Frontend rendering still pending.
 - [x] Citizen incident reporting + verification workflow — **backend only**
 - [ ] **Citizen reporting via PWA / SMS / WhatsApp** — not started (API only; no frontend at all yet, no SMS keyword intake)
-- [ ] **Life-safety Tier 1 start: vulnerable-persons registry (N4)** — not started
+- [ ] **Life-safety Tier 1 start: vulnerable-persons registry (N4)** — not started ← **next**
 
 > **⚠️ Sequencing note:** development did **not** follow this phase order. We built one
 > hazard vertically end-to-end (detect → classify → impact → CAP warning → tiered publish →
