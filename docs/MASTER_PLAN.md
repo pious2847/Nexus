@@ -646,7 +646,25 @@ Each phase is shippable and demoable on its own.
       `signature`/`signing_key_id`/`signed_at` (migration 0014). Signing is skipped
       gracefully (dev-mode, alert still publishes) if `ALERT_SIGNING_*` env vars are unset.
 - [ ] Last-mile community/radio channels (**N6**)
-- [ ] **"I'm Safe" check-in (N1)** + SOS (N2) tied to active events
+- [x] **"I'm Safe" check-in (N1)** — live-verified 2026-07-08, **SOS (N2) still open**.
+      Tier-1 life-saving priority (spec 02's own prioritization). SMS is the primary
+      channel (no smartphone/app required) — `SAFE, <place>` / `HELP, <place>` /
+      `INJURED, <place>`, optionally `, <name>` for a community focal person checking in
+      someone else on their behalf (the N6 "last-mile human network" pattern, built ahead
+      of N6 itself). Routed through the **same shared inbound SMS webhook** as citizen
+      reports (`/api/v1/sms-intake/inbound`) — a real provider posts every message to one
+      URL, so dispatch-by-keyword happens there rather than a second webhook. A check-in
+      **auto-links to the most recent open hazard event covering that place** (ltree
+      ancestor match) without the sender needing to know an event ID — never rejected for
+      lack of context, only for an unresolvable place (nothing useful to aggregate a
+      place-less check-in into). `GET /api/v1/safety-checkins/event/:id/summary` gives
+      officers the aggregated "who's accounted for" view spec 02 describes. Deliberately
+      **no verification/trust gate** on check-ins (unlike incident reports) — a false "I'm
+      safe" is far less dangerous than a missed one. Live-verified with a real SMS to the
+      user's own phone: self check-in auto-linked to a real open event, an on-behalf-of
+      check-in captured the subject's name correctly, aggregated summary matched
+      (`safe:1, need_help:1`), unauthenticated access to the officer view correctly 401'd.
+      `safety_checkins` table, migration 0015.
 - [x] **Disease surveillance module (Module D)** — live-verified 2026-07-08: case reporting
       (`/api/v1/health-cases`) + a health-facility registry (`/api/v1/health-facilities`),
       built as two parallel workstreams (multi-agent) against a shared migration/RBAC
