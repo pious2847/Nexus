@@ -622,14 +622,29 @@ Each phase is shippable and demoable on its own.
       **Live-verified with a real send:** published a real alert to a subscriber using the
       user's own email — `email_attempted:1, email_delivered:1` (actual Gmail send
       confirmed, message received). WhatsApp fan-out is fully wired and unit/integration
-      tested (`attempted:1`) but **cannot be live-verified yet** — `WHATSAPP_PHONE_ID` is
-      still not configured (`WHATSAPP_TOKEN` is), so it correctly falls back to dev-mode
-      logging (`delivered:0`) exactly like SMS did before `ARKESEL_API_KEY` was set. Push
+      tested (`attempted:1`) but not yet delivering: the adapter initially read the wrong
+      env var name (`WHATSAPP_PHONE_ID`; fixed to match the legacy WhatsApp bot's actual
+      `WHATSAPP_PHONE_NUMBER_ID`), and after that fix a real send attempt against Meta's
+      Cloud API still failed with `OAuthException` code 190 (Authentication Error) — the
+      configured `WHATSAPP_TOKEN` is expired/invalid, a real external credential issue the
+      user needs to refresh in their Meta Developer console, not a code bug. Push
       (web-push/PWA) and voice remain genuinely not started — push has a `push_subscriptions`
       table already in the schema (Phase 0) but no subscribe endpoint or PWA to call it, and
       building backend-only send logic with nothing to receive it would be unverifiable
       busywork; deferred until the PWA exists.
-- [ ] Signed alerts (**N10**)
+- [x] **Signed alerts (N10)** — live-verified 2026-07-08: published alerts are signed with
+      an Ed25519 keypair (`modules/alerts/alerts.signing.ts`, Node's built-in `crypto`, no
+      new dependency) over a canonical (recursively key-sorted) encoding of the CAP payload,
+      so re-serialization order never breaks verification. `GET /api/v1/warnings/public-key`
+      (no auth) exposes the public key so anyone can verify independently rather than
+      trusting the server's own claim — the actual anti-spoofing property, not just a
+      decorative "Verified" badge. `GET /api/v1/warnings/:id/verify` (no auth) recomputes
+      the CAP payload from the current DB row and checks the signature against it. **Proved
+      genuinely tamper-evident, not just present:** published a real alert (`verified:true`),
+      then directly mutated the stored headline in the DB (simulating a compromised row) and
+      re-verified — correctly flipped to `verified:false`. `warnings` gained
+      `signature`/`signing_key_id`/`signed_at` (migration 0014). Signing is skipped
+      gracefully (dev-mode, alert still publishes) if `ALERT_SIGNING_*` env vars are unset.
 - [ ] Last-mile community/radio channels (**N6**)
 - [ ] **"I'm Safe" check-in (N1)** + SOS (N2) tied to active events
 - [x] **Disease surveillance module (Module D)** — live-verified 2026-07-08: case reporting

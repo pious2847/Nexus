@@ -27,6 +27,19 @@ export function buildAlertsRouter({ alerts, rbac }: CoreServices): Router {
     res.json({ success: true, count: data.length, data });
   });
 
+  // Public signing key — anyone can fetch this and independently verify a signature
+  // without trusting this server's own "verified" claim (spec 02 N10). Registered
+  // BEFORE '/:id' — otherwise the wildcard route would swallow this path (treating
+  // "public-key" as an alert id).
+  router.get('/public-key', (_req, res) => {
+    const key = alerts.getPublicKey();
+    if (!key) {
+      res.status(404).json({ success: false, message: 'Alert signing is not configured' });
+      return;
+    }
+    res.json({ success: true, data: key });
+  });
+
   router.get('/:id', async (req, res) => {
     const alert = await alerts.getAlert(String(req.params.id));
     if (!alert) {
@@ -34,6 +47,18 @@ export function buildAlertsRouter({ alerts, rbac }: CoreServices): Router {
       return;
     }
     res.json({ success: true, data: { ...alert, cap: alerts.toCap(alert) } });
+  });
+
+  // Public verification — no auth required, so citizens/media can confirm an alert
+  // is genuine ("Verified · NEXUS") rather than a spoofed panic-inducing fake. Not
+  // ambiguous with '/:id' above since this path has an extra segment.
+  router.get('/:id/verify', async (req, res) => {
+    try {
+      const result = await alerts.verify(String(req.params.id));
+      res.json({ success: true, data: result });
+    } catch (err) {
+      res.status(404).json({ success: false, message: (err as Error).message });
+    }
   });
 
   // Draft from a hazard event — requires at least advisory publish rights (geo-scoped later).

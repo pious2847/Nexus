@@ -25,13 +25,17 @@ export interface AlertRow {
   whatsapp_delivered: number;
   email_attempted: number;
   email_delivered: number;
+  signature: string | null;
+  signing_key_id: string | null;
+  signed_at: string | null;
   published_at: string | null;
   created_at: string;
 }
 
 const COLS = sql`id, hazard_event_id, place_id, category, event_type, severity, urgency, certainty,
   headline, description, instruction, area_desc, status, recipients, sms_attempted, sms_delivered,
-  whatsapp_attempted, whatsapp_delivered, email_attempted, email_delivered, published_at, created_at`;
+  whatsapp_attempted, whatsapp_delivered, email_attempted, email_delivered,
+  signature, signing_key_id, signed_at, published_at, created_at`;
 
 /** Event + hazard-type + place details needed to draft an alert. */
 export interface EventForAlert {
@@ -125,6 +129,14 @@ export async function setPublished(
       whatsapp_attempted = ${counts.whatsappAttempted}, whatsapp_delivered = ${counts.whatsappDelivered},
       email_attempted = ${counts.emailAttempted}, email_delivered = ${counts.emailDelivered},
       updated_at = now()
+    WHERE id = ${id}
+  `);
+}
+
+/** Records the Ed25519 signature computed over the alert's CAP payload at publish time. */
+export async function setSignature(db: Db, id: string, signature: string, keyId: string): Promise<void> {
+  await db.execute(sql`
+    UPDATE warnings SET signature = ${signature}, signing_key_id = ${keyId}, signed_at = now(), updated_at = now()
     WHERE id = ${id}
   `);
 }

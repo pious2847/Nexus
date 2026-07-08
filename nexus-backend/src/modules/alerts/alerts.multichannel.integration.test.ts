@@ -100,7 +100,7 @@ describe.runIf(RUN)('WhatsApp + email fan-out on publish (DB)', () => {
     const published = await alerts.publish(draft.id, adminId);
 
     expect(published.whatsapp_attempted).toBe(1);
-    expect(published.whatsapp_delivered).toBe(0); // no WHATSAPP_PHONE_ID in test env -> sent:false
+    expect(published.whatsapp_delivered).toBe(0); // no WHATSAPP_TOKEN/WHATSAPP_PHONE_NUMBER_ID in test env -> sent:false
     expect(published.email_attempted).toBe(1);
     // Email delivery here depends on whether GMAIL_USER/GMAIL_APP_PASSWORD are set in the
     // test environment (they are, in this repo's real .env) — don't assert a specific

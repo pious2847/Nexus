@@ -19,6 +19,7 @@ import { requiredPublishPermission, toCapJson } from './alerts.cap';
 import { formatAlertSms } from './alerts.sms';
 import { formatAlertWhatsapp } from './alerts.whatsapp';
 import { formatAlertEmail } from './alerts.email';
+import { getSigningKeys, signCapPayload, verifyCapSignature } from './alerts.signing';
 
 export class PublishForbiddenError extends Error {}
 
@@ -139,9 +140,9 @@ export class AlertsService {
       }
     }
 
-    // Fan out WhatsApp to subscribers who opted in. NOTE: not live-sendable until
-    // WHATSAPP_PHONE_ID is configured — the adapter logs instead of failing until then
-    // (see integrations/whatsapp.ts), so attempted/delivered legitimately diverge.
+    // Fan out WhatsApp to subscribers who opted in. Falls back to dev-mode logging
+    // (attempted but not delivered) if WHATSAPP_TOKEN/WHATSAPP_PHONE_NUMBER_ID are
+    // unset — see integrations/whatsapp.ts.
     let whatsappAttempted = 0;
     let whatsappDelivered = 0;
     if (placePath) {
@@ -176,6 +177,19 @@ export class AlertsService {
     await repo.setPublished(this.db, alertId, userId, {
       recipients, smsAttempted, smsDelivered, whatsappAttempted, whatsappDelivered, emailAttempted, emailDelivered,
     });
+
+    // Sign the CAP payload (spec 02 N10 — anti-spoofing) now that published_at is set,
+    // so the signature covers the same `sent` timestamp a verifier will recompute later.
+    // Skipped in dev-mode if no signing key is configured (getSigningKeys() -> null) —
+    // never blocks publishing, matching every other channel adapter's fallback pattern.
+    const keys = getSigningKeys();
+    if (keys) {
+      const publishedAlert = (await repo.getAlert(this.db, alertId)) as AlertRow;
+      const cap = this.toCap(publishedAlert);
+      const { signature } = signCapPayload(cap, keys);
+      await repo.setSignature(this.db, alertId, signature, keys.keyId);
+    }
+
     await this.audit?.record({
       actorId: userId,
       action: 'alert.published',
@@ -184,10 +198,37 @@ export class AlertsService {
       placeId: alert.place_id,
       metadata: {
         severity: alert.severity, recipients, smsAttempted, smsDelivered,
-        whatsappAttempted, whatsappDelivered, emailAttempted, emailDelivered,
+        whatsappAttempted, whatsappDelivered, emailAttempted, emailDelivered, signed: !!keys,
       },
     });
 
     return (await repo.getAlert(this.db, alertId)) as AlertRow;
+  }
+
+  /** The public signing key + algorithm, so anyone can verify a signature independently (no auth). */
+  getPublicKey(): { keyId: string; publicKeyPem: string; algorithm: 'Ed25519' } | null {
+    const keys = getSigningKeys();
+    return keys ? { keyId: keys.keyId, publicKeyPem: keys.publicKeyPem, algorithm: 'Ed25519' } : null;
+  }
+
+  /**
+   * Recomputes verification of a published alert's signature against the
+   * current public key. Does NOT trust the stored signature blindly — it
+   * re-derives the CAP payload from the alert row and checks the signature
+   * over that, so a tampered DB row (or a tampered signature) both fail.
+   */
+  async verify(id: string): Promise<{
+    verified: boolean;
+    signature: string | null;
+    keyId: string | null;
+    signedAt: string | null;
+    cap: ReturnType<AlertsService['toCap']>;
+  }> {
+    const alert = await repo.getAlert(this.db, id);
+    if (!alert) throw new Error('Alert not found');
+    const cap = this.toCap(alert);
+    const keys = getSigningKeys();
+    const verified = !!(alert.signature && keys && verifyCapSignature(cap, alert.signature, keys.publicKeyPem));
+    return { verified, signature: alert.signature, keyId: alert.signing_key_id, signedAt: alert.signed_at, cap };
   }
 }

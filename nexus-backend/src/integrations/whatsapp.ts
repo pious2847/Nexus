@@ -1,13 +1,9 @@
 /**
  * WhatsApp adapter (Meta Cloud API). Isolated so flows are testable without a
- * live phone-number-id, matching the Arkesel/email adapters' pattern.
- *
- * HONESTY NOTE: as of this writing, WHATSAPP_TOKEN is configured but
- * WHATSAPP_PHONE_ID is NOT — so this adapter cannot be live-verified with a
- * real send yet (see nexus-live-test-contacts memory / modules/alerts/README.md).
- * It falls back to a dev-mode log exactly like the other channels do, so the
- * rest of the fan-out pipeline (subscriber lookup, formatting, delivery
- * counters) is fully exercised and testable regardless.
+ * live phone-number-id, matching the Arkesel/email adapters' pattern. Shares
+ * credentials with the legacy sanitation WhatsApp bot (src/services/whatsappService.js)
+ * — WHATSAPP_PHONE_NUMBER_ID is the canonical env var name (matches the legacy
+ * code), not WHATSAPP_PHONE_ID.
  */
 import axios from 'axios';
 
@@ -19,11 +15,11 @@ export interface WhatsappResult {
 
 export async function sendWhatsapp(to: string, message: string): Promise<WhatsappResult> {
   const token = process.env.WHATSAPP_TOKEN;
-  const phoneId = process.env.WHATSAPP_PHONE_ID;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
   if (!token || !phoneId) {
-    console.warn(`[whatsapp:dev] (no WHATSAPP_TOKEN/WHATSAPP_PHONE_ID) would send to ${to}: ${message}`);
-    return { sent: false, provider: 'none', detail: 'WHATSAPP_TOKEN/WHATSAPP_PHONE_ID not set' };
+    console.warn(`[whatsapp:dev] (no WHATSAPP_TOKEN/WHATSAPP_PHONE_NUMBER_ID) would send to ${to}: ${message}`);
+    return { sent: false, provider: 'none', detail: 'WHATSAPP_TOKEN/WHATSAPP_PHONE_NUMBER_ID not set' };
   }
 
   try {
