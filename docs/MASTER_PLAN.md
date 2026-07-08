@@ -611,7 +611,24 @@ Each phase is shippable and demoable on its own.
 ### Phase 2 — Alerts, health & citizen engagement  → **partially pulled forward into Phase 1 (see note above)**
 - [x] CAP alerts + tiered publish authority + subscriptions
 - [x] SMS fan-out (**N9** guaranteed-delivery groundwork — in-app + SMS; push/WhatsApp/voice still open)
-- [ ] Geo-targeted **multi-channel** broadcasts (push, WhatsApp, voice) — SMS only so far
+- [x] **Geo-targeted multi-channel broadcasts — email + WhatsApp** (2026-07-08). Extends
+      the existing SMS fan-out (`AlertsService.publish()`) with the same
+      subscribe/opt-out pattern per channel (`subscriptions.channels` + `notification_preferences`
+      already supported all six channels in the schema — only the SMS branch was actually
+      implemented before this). `integrations/email.ts` (nodemailer/Gmail app-password,
+      dev-mode log fallback) and `integrations/whatsapp.ts` (Meta Cloud API, same fallback
+      pattern) mirror `integrations/arkesel.ts` exactly. `warnings` table gained
+      `whatsapp_attempted/delivered` + `email_attempted/delivered` counters (migration 0013).
+      **Live-verified with a real send:** published a real alert to a subscriber using the
+      user's own email — `email_attempted:1, email_delivered:1` (actual Gmail send
+      confirmed, message received). WhatsApp fan-out is fully wired and unit/integration
+      tested (`attempted:1`) but **cannot be live-verified yet** — `WHATSAPP_PHONE_ID` is
+      still not configured (`WHATSAPP_TOKEN` is), so it correctly falls back to dev-mode
+      logging (`delivered:0`) exactly like SMS did before `ARKESEL_API_KEY` was set. Push
+      (web-push/PWA) and voice remain genuinely not started — push has a `push_subscriptions`
+      table already in the schema (Phase 0) but no subscribe endpoint or PWA to call it, and
+      building backend-only send logic with nothing to receive it would be unverifiable
+      busywork; deferred until the PWA exists.
 - [ ] Signed alerts (**N10**)
 - [ ] Last-mile community/radio channels (**N6**)
 - [ ] **"I'm Safe" check-in (N1)** + SOS (N2) tied to active events

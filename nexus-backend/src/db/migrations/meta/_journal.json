@@ -92,6 +92,13 @@
       "when": 1752451200000,
       "tag": "0012_disease_cases_composite_idx",
       "breakpoints": false
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1752537600000,
+      "tag": "0013_warnings_multichannel",
+      "breakpoints": false
     }
   ]
 }

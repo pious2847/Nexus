@@ -11,14 +11,20 @@ import type { AuditRecorder } from '../../core/audit/audit.service';
 import type { RbacService } from '../../core/rbac/rbac.service';
 import type { NotificationsService } from '../../core/notifications/notifications.service';
 import { sendSms as defaultSendSms, type SmsResult } from '../../integrations/arkesel';
+import { sendWhatsapp as defaultSendWhatsapp, type WhatsappResult } from '../../integrations/whatsapp';
+import { sendEmail as defaultSendEmail, type EmailResult } from '../../integrations/email';
 import * as repo from './alerts.repository';
 import type { AlertRow } from './alerts.repository';
 import { requiredPublishPermission, toCapJson } from './alerts.cap';
 import { formatAlertSms } from './alerts.sms';
+import { formatAlertWhatsapp } from './alerts.whatsapp';
+import { formatAlertEmail } from './alerts.email';
 
 export class PublishForbiddenError extends Error {}
 
 type SmsSender = (to: string, message: string) => Promise<SmsResult>;
+type WhatsappSender = (to: string, message: string) => Promise<WhatsappResult>;
+type EmailSender = (to: string, subject: string, html: string, text?: string) => Promise<EmailResult>;
 
 export class AlertsService {
   constructor(
@@ -27,6 +33,8 @@ export class AlertsService {
     private readonly notifications: NotificationsService,
     private readonly audit?: AuditRecorder,
     private readonly sendSms: SmsSender = defaultSendSms,
+    private readonly sendWhatsapp: WhatsappSender = defaultSendWhatsapp,
+    private readonly sendEmail: EmailSender = defaultSendEmail,
   ) {}
 
   getAlert(id: string) {
@@ -131,14 +139,53 @@ export class AlertsService {
       }
     }
 
-    await repo.setPublished(this.db, alertId, userId, { recipients, smsAttempted, smsDelivered });
+    // Fan out WhatsApp to subscribers who opted in. NOTE: not live-sendable until
+    // WHATSAPP_PHONE_ID is configured — the adapter logs instead of failing until then
+    // (see integrations/whatsapp.ts), so attempted/delivered legitimately diverge.
+    let whatsappAttempted = 0;
+    let whatsappDelivered = 0;
+    if (placePath) {
+      const whatsappSubscribers = await repo.findWhatsappSubscribers(this.db, placePath);
+      const message = formatAlertWhatsapp({ headline: alert.headline, instruction: alert.instruction });
+      for (const sub of whatsappSubscribers) {
+        whatsappAttempted++;
+        const result = await this.sendWhatsapp(sub.phone, message);
+        if (result.sent) whatsappDelivered++;
+      }
+    }
+
+    // Fan out email to subscribers who opted in.
+    let emailAttempted = 0;
+    let emailDelivered = 0;
+    if (placePath) {
+      const emailSubscribers = await repo.findEmailSubscribers(this.db, placePath);
+      const { subject, html, text } = formatAlertEmail({
+        headline: alert.headline,
+        description: alert.description,
+        instruction: alert.instruction,
+        severity: alert.severity as CapSeverity,
+        areaDesc: alert.area_desc,
+      });
+      for (const sub of emailSubscribers) {
+        emailAttempted++;
+        const result = await this.sendEmail(sub.email, subject, html, text);
+        if (result.sent) emailDelivered++;
+      }
+    }
+
+    await repo.setPublished(this.db, alertId, userId, {
+      recipients, smsAttempted, smsDelivered, whatsappAttempted, whatsappDelivered, emailAttempted, emailDelivered,
+    });
     await this.audit?.record({
       actorId: userId,
       action: 'alert.published',
       resourceType: 'alert',
       resourceId: alertId,
       placeId: alert.place_id,
-      metadata: { severity: alert.severity, recipients, smsAttempted, smsDelivered },
+      metadata: {
+        severity: alert.severity, recipients, smsAttempted, smsDelivered,
+        whatsappAttempted, whatsappDelivered, emailAttempted, emailDelivered,
+      },
     });
 
     return (await repo.getAlert(this.db, alertId)) as AlertRow;

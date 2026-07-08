@@ -21,13 +21,17 @@ export interface AlertRow {
   recipients: number;
   sms_attempted: number;
   sms_delivered: number;
+  whatsapp_attempted: number;
+  whatsapp_delivered: number;
+  email_attempted: number;
+  email_delivered: number;
   published_at: string | null;
   created_at: string;
 }
 
 const COLS = sql`id, hazard_event_id, place_id, category, event_type, severity, urgency, certainty,
   headline, description, instruction, area_desc, status, recipients, sms_attempted, sms_delivered,
-  published_at, created_at`;
+  whatsapp_attempted, whatsapp_delivered, email_attempted, email_delivered, published_at, created_at`;
 
 /** Event + hazard-type + place details needed to draft an alert. */
 export interface EventForAlert {
@@ -105,11 +109,21 @@ export async function setPublished(
   db: Db,
   id: string,
   userId: string,
-  counts: { recipients: number; smsAttempted: number; smsDelivered: number },
+  counts: {
+    recipients: number;
+    smsAttempted: number;
+    smsDelivered: number;
+    whatsappAttempted: number;
+    whatsappDelivered: number;
+    emailAttempted: number;
+    emailDelivered: number;
+  },
 ): Promise<void> {
   await db.execute(sql`
     UPDATE warnings SET status = 'published', published_by = ${userId}, published_at = now(),
       recipients = ${counts.recipients}, sms_attempted = ${counts.smsAttempted}, sms_delivered = ${counts.smsDelivered},
+      whatsapp_attempted = ${counts.whatsappAttempted}, whatsapp_delivered = ${counts.whatsappDelivered},
+      email_attempted = ${counts.emailAttempted}, email_delivered = ${counts.emailDelivered},
       updated_at = now()
     WHERE id = ${id}
   `);
@@ -141,4 +155,36 @@ export async function findSmsSubscribers(db: Db, placePath: string): Promise<{ u
       AND (np.enabled IS DISTINCT FROM false)
   `);
   return (r.rows as unknown as { user_id: string; phone: string }[]).map((x) => ({ userId: x.user_id, phone: x.phone }));
+}
+
+/** Same shape/opt-out semantics as findSmsSubscribers, for the 'whatsapp' channel. */
+export async function findWhatsappSubscribers(db: Db, placePath: string): Promise<{ userId: string; phone: string }[]> {
+  const r = await db.execute(sql`
+    SELECT DISTINCT u.id AS user_id, u.phone
+    FROM subscriptions s
+    JOIN places p ON s.place_id = p.id
+    JOIN users u ON u.id = s.user_id
+    LEFT JOIN notification_preferences np ON np.user_id = s.user_id AND np.channel = 'whatsapp'
+    WHERE (p.path <@ ${placePath}::ltree OR ${placePath}::ltree <@ p.path)
+      AND 'whatsapp' = ANY(s.channels)
+      AND u.phone IS NOT NULL
+      AND (np.enabled IS DISTINCT FROM false)
+  `);
+  return (r.rows as unknown as { user_id: string; phone: string }[]).map((x) => ({ userId: x.user_id, phone: x.phone }));
+}
+
+/** Same shape/opt-out semantics as findSmsSubscribers, for the 'email' channel. */
+export async function findEmailSubscribers(db: Db, placePath: string): Promise<{ userId: string; email: string }[]> {
+  const r = await db.execute(sql`
+    SELECT DISTINCT u.id AS user_id, u.email
+    FROM subscriptions s
+    JOIN places p ON s.place_id = p.id
+    JOIN users u ON u.id = s.user_id
+    LEFT JOIN notification_preferences np ON np.user_id = s.user_id AND np.channel = 'email'
+    WHERE (p.path <@ ${placePath}::ltree OR ${placePath}::ltree <@ p.path)
+      AND 'email' = ANY(s.channels)
+      AND u.email IS NOT NULL
+      AND (np.enabled IS DISTINCT FROM false)
+  `);
+  return (r.rows as unknown as { user_id: string; email: string }[]).map((x) => ({ userId: x.user_id, email: x.email }));
 }
