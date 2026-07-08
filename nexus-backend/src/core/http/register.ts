@@ -13,6 +13,7 @@ import { buildAlertsRouter } from '../../modules/alerts/alerts.routes';
 import { buildNotificationsRouter } from '../notifications/notifications.routes';
 import { buildHazardMapRouter } from '../../modules/hazards/hazardmap.routes';
 import { buildVulnerablePersonsRouter } from '../../modules/vulnerable/vulnerable.routes';
+import { buildReportSmsRouter } from '../../modules/reports/sms/report-sms.routes';
 import { startHazardJobs } from '../../modules/hazards/hazards.jobs';
 
 export function registerCoreRoutes(app: Express): void {
@@ -31,8 +32,9 @@ export function registerCoreRoutes(app: Express): void {
   // Mounted at /hazard-map to avoid the legacy /map (sanitation asset layers) route.
   app.use('/api/v1/hazard-map', buildHazardMapRouter(services.hazardMap));
   app.use('/api/v1/vulnerable-persons', buildVulnerablePersonsRouter(services));
+  app.use('/api/v1/sms-intake', buildReportSmsRouter(services));
 
-  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons (TypeScript)');
+  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake (TypeScript)');
 
   // Scheduled hazard evaluators (opt-in via ENABLE_HAZARD_JOBS).
   startHazardJobs({ db: services.db, hazards: services.hazards, geography: services.geography });

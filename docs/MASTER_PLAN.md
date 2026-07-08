@@ -554,7 +554,8 @@ Each phase is shippable and demoable on its own.
 ### Phase 1 — Multi-hazard core + nationwide  → **status as of 2026-07-04 (honest checklist)**
 > **Agreed sequencing (2026-07-03):** finish remaining Phase 1 gaps in order — drought ✅ →
 > GloFAS (floods) ✅ → national multi-hazard map ✅ → vulnerable-persons registry (N4) ✅ →
-> citizen PWA/SMS intake — before returning to Phase 2.
+> citizen SMS intake ✅ — before returning to Phase 2. (PWA/frontend intake is a separate,
+> larger, not-yet-started body of work — see below.)
 - [x] Hazard registry + event lifecycle (config-driven, CAP-classified, state machine)
 - [x] Generalize flood logic (generic evaluator pattern — any hazard is a config row + evaluator)
 - [x] Heavy-rainfall monitoring (Open-Meteo, live-verified)
@@ -575,7 +576,21 @@ Each phase is shippable and demoable on its own.
       every district via ltree; on real data this correctly lit up **174 districts** across
       the affected regions from just 8 underlying events. Frontend rendering still pending.
 - [x] Citizen incident reporting + verification workflow — **backend only**
-- [ ] **Citizen reporting via PWA / SMS / WhatsApp** — not started (API only; no frontend at all yet, no SMS keyword intake) ← **next**
+- [x] **Citizen reporting via SMS** — live-verified 2026-07-08: `REPORT <type>, <place>,
+      <description>` grammar (`modules/reports/sms/report-sms.parser.ts`), inbound webhook
+      `/api/v1/sms-intake/inbound` reuses `GeographyService.resolveDistrict` (fuzzy district
+      match) and `ReportsService.submit` — no report-creation logic duplicated. Arkesel's
+      two-way inbound payload format isn't publicly documented (their product for it is
+      "KOVA IQ"), so `integrations/arkeselInbound.ts` normalizes via a defensive multi-alias
+      adapter rather than assuming an unverified schema — documented prominently as the one
+      file to update once a real payload is captured. Verified over real HTTP against all 4
+      cases: well-formed normalized `{from,text}` payload → report created + confirmation SMS;
+      Arkesel-alias-shaped `{sender,message}` payload → normalizes identically; malformed text
+      → graceful HELP-text reply, no report created; fully unparseable payload → 200 with a
+      failure message (no webhook retry storms). Optional `SMS_INBOUND_TOKEN` shared-secret
+      guard (open if unset — dev-friendly, must be set in production).
+- [ ] **Citizen reporting via PWA / WhatsApp** — SMS intake done; PWA (frontend) and WhatsApp
+      keyword intake remain not started ← **next candidate, or return to Phase 2**
 - [x] **Life-safety Tier 1 start: vulnerable-persons registry (N4)** — live-verified 2026-07-05:
       `/api/v1/vulnerable-persons/*`, geo-scoped RBAC (no endpoint ever lists "everyone
       nationally" — every list requires an explicit scope place, permission-checked against
