@@ -33,6 +33,9 @@ export const PERMISSIONS = {
   'health.case.read': 'View disease case reports and surveillance data',
   'safety.checkin.create': '"I\'m Safe" check-in — self or on behalf of someone else',
   'safety.checkin.read': 'View aggregated safety check-ins for a hazard event / area',
+  'sos.create': 'Send an SOS / panic-button alert',
+  'sos.read': 'View open SOS alerts for an area',
+  'sos.manage': 'Acknowledge / resolve an SOS alert',
   'user.manage': 'Manage user accounts',
   'role.assign': 'Assign roles to users',
   'org.manage': 'Manage organizations',
@@ -54,6 +57,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'response.manage', 'vulnerable.create', 'vulnerable.read', 'vulnerable.manage',
     'health.facility.read', 'health.facility.manage', 'health.case.read',
     'safety.checkin.create', 'safety.checkin.read',
+    'sos.create', 'sos.read', 'sos.manage',
   ],
   regional_coordinator: [
     'hazard.event.read', 'hazard.event.create', 'hazard.event.transition',
@@ -63,6 +67,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'vulnerable.create', 'vulnerable.read', 'vulnerable.manage',
     'health.facility.read', 'health.facility.manage', 'health.case.read',
     'safety.checkin.create', 'safety.checkin.read',
+    'sos.create', 'sos.read', 'sos.manage',
   ],
   district_officer: [
     'hazard.event.read', 'hazard.event.create',
@@ -72,20 +77,24 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'health.facility.create', 'health.facility.read', 'health.facility.manage',
     'health.case.create', 'health.case.read',
     'safety.checkin.create', 'safety.checkin.read',
+    'sos.create', 'sos.read', 'sos.manage',
   ],
   // Field workers register + view (geo-scoped to their assigned place, like reports) —
   // but status/consent changes (e.g. marking someone deceased) stay with officers+.
   // Same pattern for health: they can report cases + see facilities, not manage/close facilities.
+  // Same for SOS: they can see + create, but acknowledging/resolving stays with officers+.
   field_worker: [
     'report.create', 'report.read', 'sanitation.manage', 'vulnerable.create', 'vulnerable.read',
     'health.facility.read', 'health.case.create', 'health.case.read',
     'safety.checkin.create', 'safety.checkin.read',
+    'sos.create', 'sos.read',
   ],
   // Community moderators are the "focal person" N6/N1 relies on — they can check people
   // in on their behalf, and see the local aggregate to know who's still unaccounted for.
-  community_moderator: ['report.read', 'report.verify', 'safety.checkin.create', 'safety.checkin.read'],
+  community_moderator: ['report.read', 'report.verify', 'safety.checkin.create', 'safety.checkin.read', 'sos.create', 'sos.read'],
   ngo_partner: ['data.dataset.read', 'data.request.create', 'report.read', 'response.manage'],
   researcher: ['data.dataset.read', 'data.request.create'],
   data_consumer: ['data.dataset.read'],
-  citizen: ['report.create', 'report.read', 'safety.checkin.create'],
+  // Citizens can send an SOS but not browse others' — that's an officer/moderator view.
+  citizen: ['report.create', 'report.read', 'safety.checkin.create', 'sos.create'],
 };

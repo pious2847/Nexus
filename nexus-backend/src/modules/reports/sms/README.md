@@ -42,14 +42,15 @@ North") and unambiguous SMS parsing needs a separator.
 - `report-sms.routes.ts` — `/api/v1/sms-intake/inbound` (public webhook, no
   user auth). Optional shared-secret guard via `SMS_INBOUND_TOKEN` (`?token=`
   query param) — **must be set before pointing a real provider at this in
-  production**; open in dev if unset. **This is now the single dispatch point
-  for all inbound SMS** — it also routes `SAFE`/`HELP`/`INJURED` messages to
-  the "I'm Safe" check-in handler (`modules/safety/sms`, spec 02 N1) via
-  `isCheckinCommand()`, since a real provider posts every message to one URL
-  regardless of content. Known ambiguity: a bare `"HELP"` (no place) is
-  classified as a check-in attempt and gets the check-in help text, not the
-  report help text — an acceptable v1 trade-off, noted here rather than
-  silently left for someone to rediscover.
+  production**; open in dev if unset. **This is the single dispatch point for
+  all inbound SMS** — `SOS` messages route to the SOS handler first (spec 02
+  N2), then `SAFE`/`HELP`/`INJURED` to the "I'm Safe" check-in handler (spec
+  02 N1), both in `modules/safety/sms`, before falling through to report
+  parsing — since a real provider posts every message to one URL regardless
+  of content. Known ambiguity: a bare `"HELP"` (no place) is classified as a
+  check-in attempt and gets the check-in help text, not the report help text
+  — an acceptable v1 trade-off, noted here rather than silently left for
+  someone to rediscover.
 - `../../../integrations/arkeselInbound.ts` — the payload normalizer (see honesty note above).
 
 ## Setup
