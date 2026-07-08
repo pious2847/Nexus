@@ -15,6 +15,8 @@
     "ingest:rainfall": "tsx src/modules/hazards/ingest-rainfall.ts",
     "ingest:drought": "tsx src/modules/hazards/ingest-drought.ts",
     "ingest:flood": "tsx src/modules/hazards/ingest-flood.ts",
+    "ingest:outbreak": "tsx src/modules/hazards/ingest-outbreak.ts",
+    "seed:disease-types": "tsx src/modules/health/cases/seed-disease-types.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

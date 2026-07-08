@@ -11,6 +11,7 @@ import { BushfireEvaluator, type IngestSummary } from './evaluators/bushfire';
 import { RainfallEvaluator, type RainfallSummary, type RainfallTarget } from './evaluators/rainfall';
 import { DroughtEvaluator, type DroughtSummary, type DroughtTarget } from './evaluators/drought';
 import { FloodEvaluator, type FloodSummary, type FloodTarget } from './evaluators/flood';
+import { OutbreakEvaluator, type OutbreakSummary } from './evaluators/outbreak';
 
 export interface IngestDeps {
   db: Db;
@@ -51,4 +52,9 @@ export async function ingestDrought(deps: IngestDeps): Promise<DroughtSummary> {
 export async function ingestFlood(deps: IngestDeps): Promise<FloodSummary> {
   const targets: FloodTarget[] = await getRainfallTargets(deps.db); // same region-centroid targets
   return new FloodEvaluator({ db: deps.db, hazards: deps.hazards }).run(targets);
+}
+
+/** Evaluate disease-case spikes (z-score vs. a rolling weekly baseline) and raise/update disease_outbreak events. */
+export async function ingestOutbreak(deps: IngestDeps): Promise<OutbreakSummary> {
+  return new OutbreakEvaluator({ db: deps.db, hazards: deps.hazards }).run();
 }

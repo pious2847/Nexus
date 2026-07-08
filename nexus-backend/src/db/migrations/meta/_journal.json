@@ -78,6 +78,20 @@
       "when": 1752278400000,
       "tag": "0010_vulnerable_persons",
       "breakpoints": false
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1752364800000,
+      "tag": "0011_health_surveillance",
+      "breakpoints": false
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1752451200000,
+      "tag": "0012_disease_cases_composite_idx",
+      "breakpoints": false
     }
   ]
 }

@@ -615,7 +615,22 @@ Each phase is shippable and demoable on its own.
 - [ ] Signed alerts (**N10**)
 - [ ] Last-mile community/radio channels (**N6**)
 - [ ] **"I'm Safe" check-in (N1)** + SOS (N2) tied to active events
-- [ ] Disease surveillance module (case reporting, outbreak detection)
+- [x] **Disease surveillance module (Module D)** — live-verified 2026-07-08: case reporting
+      (`/api/v1/health-cases`) + a health-facility registry (`/api/v1/health-facilities`),
+      built as two parallel workstreams (multi-agent) against a shared migration/RBAC
+      foundation, then merged and wired together. `disease_cases` is epi-aggregate only
+      (age_group/sex, no patient names — data minimization). An outbreak-detection
+      evaluator (`modules/hazards/evaluators/outbreak.ts`) computes a z-score of the
+      current week's case count vs. a rolling weekly baseline per (disease, place) and
+      raises/updates the existing `disease_outbreak` hazard type — same evaluator pattern
+      as drought/flood/bushfire, weekly cron cadence. Seeded with 11 Ghana IDSR priority
+      diseases (cholera, AWD, measles, meningitis, yellow fever, guinea worm, AFP/polio,
+      neonatal tetanus, VHF, anthrax, rabies). Live-verified end-to-end: facility
+      register/list/update, case report with FK-validated disease code (unknown code →
+      graceful 400, not a 500), unauthenticated → 401, and a synthetic case-spike
+      injection that correctly triggered the evaluator to auto-raise a `severe`
+      `disease_outbreak` watch (z=19) — then cleaned up. Not yet built: line-list /
+      contact-tracing (optional per spec), DHIMS2 interop export.
 - [ ] PWA offline-first hardening (**degraded-mode, N8**)
 - [ ] i18n (first local languages)
 
