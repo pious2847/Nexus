@@ -112,3 +112,107 @@ export async function updateFacility(db: Db, id: string, patch: UpdateFacilityPa
   `);
   return (r.rows[0] as unknown as HealthFacilityRow) ?? null;
 }
+
+/**
+ * Live capacity time series (Module N16 — mass-casualty coordination).
+ * DDL: src/db/migrations/0021_damage_assessments_facility_capacity.sql
+ * (facility_capacity_status table). Every report is a NEW row — never
+ * updated in place — so "current status" is always the latest row per
+ * facility, ordered by reported_at DESC.
+ */
+export interface CapacityStatusRow {
+  id: string;
+  facility_id: string;
+  beds_available: number | null;
+  blood_units_available: number | null;
+  ambulances_available: number | null;
+  status: string;
+  reported_by: string | null;
+  reported_at: string;
+}
+
+const CAPACITY_COLS = sql`id, facility_id, beds_available, blood_units_available, ambulances_available, status, reported_by, reported_at`;
+
+export interface InsertCapacityStatusInput {
+  bedsAvailable?: number | null;
+  bloodUnitsAvailable?: number | null;
+  ambulancesAvailable?: number | null;
+  status: string;
+  reportedBy?: string | null;
+}
+
+/** Insert a new capacity report for a facility. Never updates in place. */
+export async function insertCapacityStatus(
+  db: Db,
+  facilityId: string,
+  input: InsertCapacityStatusInput,
+): Promise<CapacityStatusRow> {
+  const r = await db.execute(sql`
+    INSERT INTO facility_capacity_status (facility_id, beds_available, blood_units_available, ambulances_available, status, reported_by)
+    VALUES (${facilityId}, ${input.bedsAvailable ?? null}, ${input.bloodUnitsAvailable ?? null}, ${input.ambulancesAvailable ?? null}, ${input.status}, ${input.reportedBy ?? null})
+    RETURNING ${CAPACITY_COLS}
+  `);
+  return r.rows[0] as unknown as CapacityStatusRow;
+}
+
+/** Latest capacity report for a facility, or null if none has ever been filed. */
+export async function getLatestCapacityStatus(db: Db, facilityId: string): Promise<CapacityStatusRow | null> {
+  const r = await db.execute(sql`
+    SELECT ${CAPACITY_COLS} FROM facility_capacity_status
+    WHERE facility_id = ${facilityId}
+    ORDER BY reported_at DESC
+    LIMIT 1
+  `);
+  return (r.rows[0] as unknown as CapacityStatusRow) ?? null;
+}
+
+export interface NearestWithCapacityRow {
+  id: string;
+  name: string;
+  facility_type: string;
+  contact_phone: string | null;
+  lng: number;
+  lat: number;
+  beds_available: number | null;
+  blood_units_available: number | null;
+  ambulances_available: number | null;
+  status: string;
+  reported_at: string;
+  meters: number;
+}
+
+/**
+ * Nearest facility to a point that has a (non-closed) capacity report meeting
+ * the given filters, ordered by PostGIS KNN distance (mirrors
+ * shelter.repository.ts's findNearestOpen). Citizen/responder-facing / public
+ * — no scope filter, that's a route-layer decision.
+ */
+export async function findNearestWithCapacity(
+  db: Db,
+  point: { lng: number; lat: number },
+  opts: { minBeds?: number; status?: string } = {},
+  limit = 5,
+): Promise<NearestWithCapacityRow[]> {
+  const p = sql`ST_SetSRID(ST_MakePoint(${point.lng}, ${point.lat}), 4326)`;
+  const conds = [sql`f.geometry IS NOT NULL`, sql`l.status != 'closed'`];
+  if (opts.minBeds != null) conds.push(sql`l.beds_available >= ${opts.minBeds}`);
+  if (opts.status) conds.push(sql`l.status = ${opts.status}`);
+  const where = sql.join(conds, sql` AND `);
+  const r = await db.execute(sql`
+    WITH latest AS (
+      SELECT DISTINCT ON (facility_id) *
+      FROM facility_capacity_status
+      ORDER BY facility_id, reported_at DESC
+    )
+    SELECT f.id, f.name, f.facility_type, f.contact_phone,
+           ST_X(f.geometry) AS lng, ST_Y(f.geometry) AS lat,
+           l.beds_available, l.blood_units_available, l.ambulances_available, l.status, l.reported_at,
+           ST_Distance(f.geometry::geography, ${p}::geography) AS meters
+    FROM health_facilities f
+    JOIN latest l ON l.facility_id = f.id
+    WHERE ${where}
+    ORDER BY f.geometry <-> ${p}
+    LIMIT ${limit}
+  `);
+  return r.rows as unknown as NearestWithCapacityRow[];
+}

@@ -15,8 +15,20 @@ data — it's public infrastructure data. Design choices reflect that:
 - **Registration is an officer's job** — `district_officer`+ create; regional/
   national roles get read+manage (oversight) but not create (they don't
   register facilities themselves).
-- **Every mutation audited** (`health.facility.registered`, `health.facility.updated`).
+- **Every mutation audited** (`health.facility.registered`, `health.facility.updated`,
+  `health.facility.capacity_reported`).
 - **Partial updates** — `PATCH /:id` only touches the fields you send.
+
+### N16 — live capacity & mass-casualty coordination
+Extends the static registry above with a live, frequently-updated capacity
+layer: bed/blood/ambulance availability during emergencies, so casualties get
+routed to a facility that actually has room. Backed by
+`facility_capacity_status` (migration `0021_damage_assessments_facility_capacity.sql`),
+a **time series, not updated in place** — every report is a new row; "current
+status" is always the latest row per facility (`ORDER BY reported_at DESC LIMIT 1`).
+Reuses the existing `health.facility.read`/`health.facility.manage` grants —
+no new permissions needed. The nearest-facility lookup is public/unauthenticated,
+same openness level as `shelter.routes.ts`'s `/nearest`.
 
 ## Files
 - `health-facility.repository.ts` — SQL via Drizzle's `sql` tag (matches
@@ -41,6 +53,17 @@ data — it's public infrastructure data. Design choices reflect that:
   scoped to the record's place)
 - `PATCH /api/v1/health-facilities/:id` — partial update of name/type/
   ownership/phone/bed_count/status (`health.facility.manage`)
+- `POST /api/v1/health-facilities/:id/capacity` — file a new live capacity
+  report (`bedsAvailable?`, `bloodUnitsAvailable?`, `ambulancesAvailable?`,
+  `status: normal|strained|overwhelmed|closed`) (`health.facility.manage`,
+  scoped to the facility's place). Always inserts a new row.
+- `GET  /api/v1/health-facilities/:id/capacity` — latest capacity report
+  (`health.facility.read`, scoped). `200 {data: null}` if no report has ever
+  been filed — that's a valid state, not an error; only an unknown facility id 404s.
+- `GET  /api/v1/health-facilities/nearest-with-capacity?lng=&lat=&minBeds=&status=&limit=`
+  — **PUBLIC, no auth**, mirrors `shelter.routes.ts`'s `/nearest`. Nearest
+  facility with a non-closed capacity report meeting the optional `minBeds`/
+  `status` filters, via PostGIS KNN (`<->`) over each facility's latest report.
 
 ## Data
 `facility_type`: `clinic | hospital | chps_compound | health_center` (default `clinic`).
