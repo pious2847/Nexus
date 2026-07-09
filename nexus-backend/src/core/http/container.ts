@@ -34,6 +34,8 @@ import { MythFactService } from '../../modules/rumors/mythfact.service';
 import { AnticipatoryService } from '../../modules/anticipatory/anticipatory.service';
 import { BadgeService } from '../../modules/reports/badges.service';
 import { OrganizationsService } from '../../modules/admin/organizations/organizations.service';
+import { CommandService } from '../../modules/command/command.service';
+import { EvacuationService } from '../../modules/evacuation/evacuation.service';
 import { AssessmentService } from '../../modules/assessments/assessment.service';
 import { AdminUsersService } from '../../modules/admin/users/admin-users.service';
 
@@ -70,6 +72,8 @@ export interface CoreServices {
   assessments: AssessmentService;
   adminUsers: AdminUsersService;
   organizations: OrganizationsService;
+  command: CommandService;
+  evacuation: EvacuationService;
 }
 
 export function createCoreServices(pool: Pool): CoreServices {
@@ -119,5 +123,7 @@ export function createCoreServices(pool: Pool): CoreServices {
     assessments: new AssessmentService(db, geography, audit),
     adminUsers: new AdminUsersService(db, audit),
     organizations: new OrganizationsService(db, audit),
+    command: new CommandService(db, audit),
+    evacuation: new EvacuationService(db),
   };
 }
