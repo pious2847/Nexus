@@ -53,6 +53,15 @@ export const PERMISSIONS = {
   'asset.manage': 'Register / assign / update a response asset (vehicle, boat, equipment)',
   'asset.read': 'View response assets',
   'analytics.read': 'View the executive summary / trend analytics dashboard for an area',
+  'missing.report': 'Report a missing person',
+  'missing.read': 'View / search the missing-persons board for an area',
+  'missing.manage': 'Update status or record a match/resolution for a missing-person report',
+  'rumor.report': 'Report a rumor for fact-checking',
+  'rumor.read': 'View reported rumors for an area',
+  'rumor.manage': 'Review / resolve a rumor report',
+  'mythfact.publish': 'Publish an official myth-vs-fact clarification',
+  'anticipatory.read': 'View anticipatory-action protocols and their activation history',
+  'anticipatory.manage': 'Configure anticipatory-action protocols (forecast-based triggers)',
   'user.manage': 'Manage user accounts',
   'role.assign': 'Assign roles to users',
   'org.manage': 'Manage organizations',
@@ -80,6 +89,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'dispatch.create', 'dispatch.read', 'dispatch.manage',
     'volunteer.read', 'volunteer.manage', 'asset.manage', 'asset.read',
     'analytics.read',
+    'missing.report', 'missing.read', 'missing.manage',
+    'rumor.report', 'rumor.read', 'rumor.manage', 'mythfact.publish',
+    'anticipatory.read', 'anticipatory.manage',
   ],
   regional_coordinator: [
     'hazard.event.read', 'hazard.event.create', 'hazard.event.transition',
@@ -95,6 +107,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'dispatch.create', 'dispatch.read', 'dispatch.manage',
     'volunteer.read', 'volunteer.manage', 'asset.manage', 'asset.read',
     'analytics.read',
+    'missing.report', 'missing.read', 'missing.manage',
+    'rumor.report', 'rumor.read', 'rumor.manage', 'mythfact.publish',
+    'anticipatory.read', 'anticipatory.manage',
   ],
   district_officer: [
     'hazard.event.read', 'hazard.event.create',
@@ -110,6 +125,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'dispatch.create', 'dispatch.read', 'dispatch.manage',
     'volunteer.create', 'volunteer.read', 'volunteer.manage', 'asset.manage', 'asset.read',
     'analytics.read',
+    'missing.report', 'missing.read', 'missing.manage',
+    'rumor.report', 'rumor.read', 'rumor.manage', 'mythfact.publish',
+    'anticipatory.read',
   ],
   // Field workers register + view (geo-scoped to their assigned place, like reports) —
   // but status/consent changes (e.g. marking someone deceased) stay with officers+.
@@ -125,6 +143,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'safety.checkin.create', 'safety.checkin.read',
     'sos.create', 'sos.read', 'focal.read',
     'shelter.read', 'dispatch.read', 'dispatch.manage', 'volunteer.create', 'volunteer.read', 'asset.read',
+    'missing.report', 'missing.read', 'rumor.report', 'rumor.read',
   ],
   // Community moderators are the "focal person" N6/N1 relies on — they can check people
   // in on their behalf, see the local aggregate to know who's still unaccounted for, and
@@ -134,17 +153,22 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'report.read', 'report.verify', 'safety.checkin.create', 'safety.checkin.read', 'sos.create', 'sos.read',
     'focal.create', 'focal.read',
     'shelter.read', 'dispatch.read', 'volunteer.create', 'volunteer.read',
+    'missing.report', 'missing.read', 'rumor.report', 'rumor.read',
   ],
   // NGO partners are a key relief-inventory stakeholder per the spec ("manage relief
   // inventory") — they get relief.manage even though most other M permissions stay read-only.
   ngo_partner: [
     'data.dataset.read', 'data.request.create', 'report.read', 'response.manage',
     'shelter.read', 'relief.read', 'relief.manage', 'dispatch.read', 'volunteer.read', 'asset.read',
-    'analytics.read',
+    'analytics.read', 'missing.read', 'rumor.read',
   ],
   researcher: ['data.dataset.read', 'data.request.create', 'analytics.read'],
   data_consumer: ['data.dataset.read'],
   // Citizens can send an SOS but not browse others' — that's an officer/moderator view.
-  // They can also register themselves as a volunteer.
-  citizen: ['report.create', 'report.read', 'safety.checkin.create', 'sos.create', 'volunteer.create'],
+  // They can also register themselves as a volunteer, and — same principle as SOS — report
+  // a missing person or a rumor without being able to browse everyone else's reports.
+  citizen: [
+    'report.create', 'report.read', 'safety.checkin.create', 'sos.create', 'volunteer.create',
+    'missing.report', 'rumor.report',
+  ],
 };
