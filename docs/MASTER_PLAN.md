@@ -142,7 +142,12 @@ The base every other module depends on.
 - 🔁 **Authentication** — JWT (RS256), email/password, refresh tokens. *Evolve:* add phone-number + OTP login for citizens.
 - 🆕 **Multi-role RBAC** — roles from §5, permission checks per module/action, scoped to geography (a district officer only sees their district).
 - 🆕 **National geography service** — canonical hierarchy: `Country → Region (16) → District/MMDA (261) → Zone/Constituency → Town/Community/Village`. Everything (reports, hazards, alerts, datasets) is tagged to a place in this tree. Mirrors NADMO's own structure (national → 16 regional → 261 district → 900+ zonal offices).
-- 🆕 **Organizations & teams** — NGOs, agencies, assemblies as first-class org entities; users belong to orgs; data ownership tracked per org.
+- ✅ **Organizations & teams** (2026-07-09) — `GET/POST /api/v1/admin/organizations`,
+  `GET/PATCH /:id`, `POST /:id/verify`, `GET /:id/members`. The `organizations` table +
+  `users.org_id` FK have existed since Phase 0, but no service/route anywhere actually
+  created or managed one — a real Phase 0 gap, not new scope. `org.manage`-gated
+  (national scope, already in the RBAC catalog, previously unimplemented). Live-verified:
+  create/list/get/update/verify/members(empty)/404-unknown/401-unauthenticated.
 - 🆕 **Account verification & vetting** — citizens self-serve; officials/NGOs/researchers require approval (needed for request-gated data).
 - ✅ **User management** (admin) (2026-07-09) — `GET /api/v1/admin/users` (list/search),
   `GET /:id`, `PATCH /:id/status` (activate/suspend), `POST /:id/roles` (grant a
@@ -176,7 +181,7 @@ Generalizes today's flood-only logic into a hazard framework aligned with the WM
 The "always be collecting clean data" engine — includes citizen crowdsourcing.
 
 - 🔁 **Field assessments** — generalize sanitation/flood assessments into reusable, form-driven assessments per hazard type, with photos (Cloudinary), GPS, offline capture.
-- 🆕 **Citizen incident reports** — anyone can report a flood/fire/outbreak/sanitation issue via PWA, SMS, WhatsApp, or (future) voice note in local language. Geo-tagged, photo-attachable.
+- 🔁 **Citizen incident reports** — SMS ✅ and WhatsApp ✅ intake done (see Phase 1 checklist); PWA and voice-note intake remain frontend-only / not started.
 - 🆕 **Report verification workflow** — Ushahidi-style: submitted → triaged → verified/rejected → promoted to a hazard event if warranted. Prevents misinformation. **Trust model (decided):** (1) officers/moderators verify; (2) **reputation score** per citizen so reliable reporters get fast-tracked; (3) **corroboration threshold** — multiple independent reports of the same incident auto-raise confidence; (4) **community moderators** — trusted locals (assembly members, teachers) can pre-verify in their area.
 - ✅ **Light gamification** (2026-07-09) — `badges`/`user_badges` tables (migration 0020), 5
   seeded badges (verified-count milestones 1/5/20 + reputation-score thresholds 50/100).
@@ -260,7 +265,19 @@ The HDX-style data-sharing platform — our path to national relevance & sustain
 ### Module I — Weather & Climate 🔁
 - ✅ **Real-time weather** (Open-Meteo) + 24h precipitation/temperature heatmaps + AI briefings.
 - 🔁 **Nationwide coverage** — all districts, not just Northern.
-- 🆕 **Forecast ingestion & storage** — persist forecasts vs. actuals to build our own historical climate dataset (feeds the future model).
+- ✅ **Forecast ingestion & storage** (2026-07-09) — the drought/flood/heavy-rainfall
+  evaluators were silently discarding every "no risk" evaluation (only alert-worthy
+  results got persisted to `hazard_predictions` — `if (!cls.severity) continue` skipped
+  `addPrediction()` entirely). Fixed by moving `addPrediction()` outside that gate in
+  all three evaluators, so every successfully-evaluated target is now logged
+  (`hazard_event_id: null` when no event was raised) — the `hazard_predictions` table
+  already existed and was already designed for exactly this, it just wasn't being used
+  for the (much larger) non-alerting majority of evaluations. Live-verified: ran the
+  real rainfall evaluator against 3 live districts (none crossed the advisory threshold
+  that day) and confirmed all 3 got prediction rows with `hazard_event_id: null` and
+  real factor data — previously these would have vanished. Genuinely insufficient-data
+  cases (the pre-existing `skipped` path) are still correctly left unlogged, since
+  there's no valid classification to record for those.
 - 🆕 **GMet integration (planned)** — official Ghana Meteorological Agency data when a data-sharing agreement is possible.
 
 ### Module J — AI Assistants & Intelligence 🔁🆕
@@ -681,8 +698,21 @@ Each phase is shippable and demoable on its own.
       → graceful HELP-text reply, no report created; fully unparseable payload → 200 with a
       failure message (no webhook retry storms). Optional `SMS_INBOUND_TOKEN` shared-secret
       guard (open if unset — dev-friendly, must be set in production).
-- [ ] **Citizen reporting via PWA / WhatsApp** — SMS intake done; PWA (frontend) and WhatsApp
-      keyword intake remain not started ← **next candidate, or return to Phase 2**
+- [x] **Citizen reporting via WhatsApp** (2026-07-09) — extends the existing legacy WhatsApp
+      bot (`services/whatsappService.js`, `REPORT DUMP`/`FLOOD`/`HEALTH`/`TOILETS`
+      commands, untouched) with the **same multi-hazard `REPORT <type>, <place>,
+      <description>` grammar and parser** as SMS intake
+      (`modules/reports/sms/report-sms.parser.ts`, reused directly — channel-agnostic,
+      no duplication), submitted through the real `ReportsService` rather than the
+      legacy sanitation-only dump-site path. Meta only supports one webhook callback
+      URL per app, so this had to extend the legacy `receive()` handler in place rather
+      than mount a second webhook — `core/http/register.ts` now stashes the TS
+      `coreServices` on `app.locals` (standard Express pattern) so the legacy CJS
+      handler can reach `ReportsService`/`GeographyService` without a rewrite.
+      Live-verified: a simulated Meta webhook payload with `REPORT FLOOD, Tolon, ...`
+      created a real incident report (`source: 'whatsapp'`, correct hazard_type/place_id),
+      and the pre-existing `REPORT DUMP` legacy path still works unmodified (backward
+      compatible). PWA citizen reporting remains frontend-only, not started.
 - [x] **Life-safety Tier 1 start: vulnerable-persons registry (N4)** — live-verified 2026-07-05:
       `/api/v1/vulnerable-persons/*`, geo-scoped RBAC (no endpoint ever lists "everyone
       nationally" — every list requires an explicit scope place, permission-checked against
