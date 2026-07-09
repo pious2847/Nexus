@@ -246,7 +246,19 @@ The HDX-style data-sharing platform — our path to national relevance & sustain
 - ✅ **AI news feed** — curated WASH/flood news + sentiment → 🔁 broaden to all-hazard news, nationwide.
 - ✅ **AI severity analysis** — dump-site/report severity scoring → 🔁 generalize to any incident photo/text.
 - ✅ **AI briefings** — plain-language weather/situation summaries.
-- 🆕 **AI report triage assistant** — suggests verification status & likely hazard type for incoming citizen reports.
+- ✅ **AI report triage assistant** (2026-07-09) — `POST /api/v1/incident-reports/:id/triage`
+  (`report.verify`-gated, geo-scoped, advisory only — never mutates the report; the officer
+  still calls the existing `/review` to actually decide). Reuses the legacy
+  `services/geminiService.js` model-fallback/retry logic (CJS interop) rather than
+  duplicating it; gracefully degrades to a structured `available:false` response (never a
+  500) if `GEMINI_API_KEY` is unset or the call fails. Live-verified: correct 200 shape on
+  both a plausible and a vague report, report status confirmed unchanged after the triage
+  call, 404 on an unknown report id, 401 unauthenticated. **Not verified: an actual
+  successful Gemini response** — the shared free-tier API key's quota was exhausted across
+  both fallback models at test time (`429` on `gemini-2.5-flash` and `gemini-2.0-flash`),
+  same class of external, user-actionable blocker as the expired `WHATSAPP_TOKEN` noted
+  earlier — the code path that handles it (graceful `available:false` instead of a crash)
+  is what's actually been proven correct here.
 - 🆕 **Natural-language data query (future)** — "show me cholera cases near flooded areas in 2024" over the Data Hub.
 
 ### Module K — Analytics, Reports & Decision Support 🔁

@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { CAP_SEVERITIES, HAZARD_TYPES } from '@nexus/shared';
 import type { CoreServices } from '../../core/http/container';
 import { requirePermission } from '../../core/rbac/rbac.middleware';
+import { suggestTriage } from './reports.triage';
 
 const auth = require('../../middleware/auth') as { authenticate: RequestHandler; optionalAuth: RequestHandler };
 
@@ -34,7 +35,7 @@ const promoteSchema = z.object({
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 const actorOf = (req: Request): string | null => (req as Request & { user?: { id: string } }).user?.id ?? null;
 
-export function buildReportsRouter({ reports, rbac }: CoreServices): Router {
+export function buildReportsRouter({ reports, rbac, geography }: CoreServices): Router {
   const router = Router();
 
   // Submit — anyone (optionally authenticated). Reporter id attached if logged in.
@@ -67,6 +68,24 @@ export function buildReportsRouter({ reports, rbac }: CoreServices): Router {
     }
     res.json({ success: true, data: report });
   });
+
+  // AI triage suggestion (Module J) — advisory only, never mutates the report. Same
+  // permission as review since it's part of the same officer workflow.
+  router.post(
+    '/:id/triage',
+    auth.authenticate,
+    requirePermission(rbac, 'report.verify', (req) => reports.reportPlacePath(String(req.params.id))),
+    async (req, res) => {
+      const report = await reports.getReport(String(req.params.id));
+      if (!report) {
+        res.status(404).json({ success: false, message: 'Report not found' });
+        return;
+      }
+      const place = report.place_id ? await geography.getById(report.place_id) : null;
+      const suggestion = await suggestTriage(report, place?.name ?? null);
+      res.json({ success: true, data: suggestion });
+    },
+  );
 
   // Verify / reject — report.verify, scoped to the report's place
   router.post(
