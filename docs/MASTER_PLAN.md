@@ -228,11 +228,11 @@ The HDX-style data-sharing platform — our path to national relevance & sustain
 - 🆕 **Usage analytics** — who downloaded/requested what; demonstrates impact to funders/government.
 
 ### Module H — Maps & Geospatial Intelligence 🔁
-- ✅ **Map explorer** — Leaflet + GeoJSON layers (toilets, facilities, flood zones, vulnerability).
-- 🔁 **National multi-hazard map** — layers for every hazard type, filterable by region/district/time; heatmaps of risk.
-- 🆕 **Live situational map** — active hazard events, alerts, and citizen reports in real time.
-- 🆕 **Historical playback** — scrub through time to see how past events unfolded (great for research + pitching to government).
-- 🆕 **Admin boundary layers** — official Ghana region/district/community boundaries as base layers.
+- ✅ **Map explorer** — Leaflet + GeoJSON layers (toilets, facilities, flood zones, vulnerability) — legacy, sanitation-scoped.
+- 🔁 **National multi-hazard map** — backend GeoJSON done (`/api/v1/hazard-map/*`, live-verified 2026-07-04); frontend rendering still pending.
+- 🆕 **Live situational map** — active hazard events via `/api/v1/hazard-map/events`; citizen reports/SOS/dispatch tasks not yet merged into one live feed (frontend concern once it exists).
+- ✅ **Historical playback** (2026-07-09) — `GET /api/v1/hazard-map/events?asOf=<ISO8601>` reconstructs which events were active, and in what state, at a past moment — derived from `event_transitions` (each event's latest transition at-or-before `asOf`; `DISTINCT ON` + `ORDER BY created_at DESC`), not a snapshot table. Live-verified using DB-ground-truth transition timestamps (not client clocks — a ~1.3s clock skew between the local dev machine and the Neon DB server was discovered and worked around during verification): confirmed state at 3 different points in an event's lifecycle, confirmed a since-closed event correctly disappears, confirmed a not-yet-created event correctly doesn't appear.
+- ✅ **Admin boundary layers** (2026-07-09) — `GET /api/v1/geography/:id/boundary` (single) and `GET /api/v1/geography/boundaries?level=&region=` (bulk FeatureCollection) expose `places.boundary`, stored since the Phase 0 geography seed but never served over HTTP until now. Live-verified: 261 district boundaries returned, Guan (the tracked no-geometry gap) correctly flagged `hasGeometry: false` rather than dropped, unknown place id 404s.
 
 ### Module I — Weather & Climate 🔁
 - ✅ **Real-time weather** (Open-Meteo) + 24h precipitation/temperature heatmaps + AI briefings.

@@ -50,6 +50,33 @@ export async function listByLevel(db: Db, level: string, parentId?: string): Pro
   return r.rows as unknown as PlaceSummary[];
 }
 
+export interface BoundaryRow {
+  id: string;
+  name: string;
+  level: string;
+  geom_json: string | null;
+}
+
+/**
+ * A single place's boundary polygon as GeoJSON text (Module H — stored since
+ * Phase 0's geography seed but never served over HTTP until now).
+ * `geom_json` is null for places with no boundary geometry yet (a handful of
+ * districts/communities, e.g. Guan — a tracked Phase 0 data gap).
+ */
+export async function getBoundary(db: Db, id: string): Promise<BoundaryRow | null> {
+  const r = await db.execute(sql`SELECT id, name, level, ST_AsGeoJSON(boundary) AS geom_json FROM places WHERE id = ${id}`);
+  return (r.rows[0] as unknown as BoundaryRow) ?? null;
+}
+
+/** Every place at a level (optionally under a region), for a map base layer. */
+export async function listBoundaries(db: Db, level: string, regionId?: string): Promise<BoundaryRow[]> {
+  const conds = [sql`level = ${level}`];
+  if (regionId) conds.push(sql`path <@ (SELECT path FROM places WHERE id = ${regionId})`);
+  const where = sql.join(conds, sql` AND `);
+  const r = await db.execute(sql`SELECT id, name, level, ST_AsGeoJSON(boundary) AS geom_json FROM places WHERE ${where} ORDER BY name`);
+  return r.rows as unknown as BoundaryRow[];
+}
+
 /** Find a region by (case-insensitive) name. */
 export async function findRegionByName(db: Db, name: string): Promise<PlaceSummary | null> {
   const r = await db.execute(

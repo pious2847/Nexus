@@ -7,6 +7,7 @@ import type { Db } from '../../shared/db';
 import * as repo from './geography.repository';
 import type { LngLat, PlaceSummary } from './geography.repository';
 import { DistrictResolver, type ResolveResult } from './geography.resolver';
+import { buildFeature, buildFeatureAllowNullGeometry, toFeatureCollection, type GeoFeature, type FeatureCollection } from '../../modules/hazards/hazardmap.util';
 
 export class GeographyService {
   private resolver?: DistrictResolver;
@@ -67,5 +68,19 @@ export class GeographyService {
   /** Nearest places of a level (e.g. nearest region/community to a location). */
   nearest(level: string, point: LngLat, limit = 1) {
     return repo.findNearest(this.db, level, point, limit);
+  }
+
+  /** A single place's boundary polygon as a GeoJSON Feature (Module H). Null if no boundary geometry yet. */
+  async boundary(id: string): Promise<GeoFeature | null> {
+    const row = await repo.getBoundary(this.db, id);
+    if (!row) return null;
+    return buildFeature(row.geom_json, { id: row.id, name: row.name, level: row.level });
+  }
+
+  /** All boundaries at a level (a map base layer) — every place is represented, even those without geometry yet. */
+  async boundaries(level: string, regionId?: string): Promise<FeatureCollection> {
+    const rows = await repo.listBoundaries(this.db, level, regionId);
+    const features = rows.map((r) => buildFeatureAllowNullGeometry(r.geom_json, { id: r.id, name: r.name, level: r.level }));
+    return toFeatureCollection(features, { layer: `${level}_boundaries` });
   }
 }
