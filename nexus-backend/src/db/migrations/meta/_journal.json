@@ -148,6 +148,13 @@
       "when": 1753142400000,
       "tag": "0020_badges",
       "breakpoints": false
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1753228800000,
+      "tag": "0021_damage_assessments_facility_capacity",
+      "breakpoints": false
     }
   ]
 }
