@@ -144,7 +144,13 @@ The base every other module depends on.
 - 🆕 **National geography service** — canonical hierarchy: `Country → Region (16) → District/MMDA (261) → Zone/Constituency → Town/Community/Village`. Everything (reports, hazards, alerts, datasets) is tagged to a place in this tree. Mirrors NADMO's own structure (national → 16 regional → 261 district → 900+ zonal offices).
 - 🆕 **Organizations & teams** — NGOs, agencies, assemblies as first-class org entities; users belong to orgs; data ownership tracked per org.
 - 🆕 **Account verification & vetting** — citizens self-serve; officials/NGOs/researchers require approval (needed for request-gated data).
-- 🔁 **User management** (admin) — activate/deactivate, assign roles + geographic scope.
+- ✅ **User management** (admin) (2026-07-09) — `GET /api/v1/admin/users` (list/search),
+  `GET /:id`, `PATCH /:id/status` (activate/suspend), `POST /:id/roles` (grant a
+  geography-scoped role, idempotent on a repeat grant), `GET /:id/roles`,
+  `DELETE /:id/roles/:roleGrantId` (revoke). National-scope only (`user.manage`/
+  `role.assign`, no geo `resolveTargetPath` — user administration isn't itself
+  geo-scoped, only the role *grants* it manages are). Closes the gap where RBAC v2's
+  `can()` engine had no HTTP surface to actually manage who holds what role.
 - 🆕 **Audit log** — who did what, when (critical for a system government may adopt).
 
 ### Module B — Multi-Hazard Early Warning & Prediction 🆕 (the new core)
@@ -845,6 +851,30 @@ Each phase is shippable and demoable on its own.
       merge conflicts**, including on `container.ts`/`register.ts`, because agents were
       scoped to their own new module directories only and the orchestrator (this session)
       did all cross-cutting wiring itself afterward in one pass.
+- [x] **Rapid damage & needs assessment (N15)** — live-verified 2026-07-09.
+      `POST /api/v1/assessments` (geo-tagged post-event household/casualty/urgent-needs
+      capture) + `GET /assessments/sitrep?scope=` (a live situation report — SUM
+      aggregation of households/persons/casualties/injuries affected, plus an
+      urgent-needs breakdown via `unnest()`/`GROUP BY`). `damage_assessments` table,
+      migration 0021. Live-verified: two seeded assessments summed correctly
+      (55 households, 240 persons, 1 casualty, 7 injuries) and the urgent-needs
+      breakdown matched exactly (water:2, shelter:1, medical:1, food:1).
+- [x] **Health-facility capacity & mass-casualty coordination (N16)** — live-verified
+      2026-07-09. Extends the existing health-facility registry (not a new module) with
+      a live capacity time series: `POST /:id/capacity` (beds/blood-units/ambulances +
+      `normal|strained|overwhelmed|closed` status, insert-only — every report is a new
+      row, not an in-place update, preserving history), `GET /:id/capacity` (latest
+      report; `200 {data:null}` is a valid "never reported" state, only an unknown
+      facility 404s), `GET /nearest-with-capacity` (public, no auth — PostGIS KNN over
+      each facility's latest report, mirrors `shelters`' `/nearest`; routing a
+      mass-casualty event to a facility that actually has room is the same openness
+      level as routing evacuees to an open shelter). Live-verified: capacity report
+      filed, latest-report lookup correct, and the public nearest-with-capacity query
+      found the test facility with the right bed count and distance.
+      N15/N16, plus **admin user & role management** (Module A/L gap, see Module A's
+      entry above), were the third batch of parallel-agent worktree builds this
+      session — again zero merge conflicts, same directory-scoped-agents +
+      centralized-orchestrator-wiring pattern established in the N3/N11/N12 batch.
 - [ ] PWA offline-first hardening (**degraded-mode, N8**)
 - [ ] i18n (first local languages)
 
