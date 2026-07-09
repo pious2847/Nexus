@@ -259,10 +259,22 @@ The HDX-style data-sharing platform — our path to national relevance & sustain
 ### Module L — Admin, Config & Platform Ops 🔁🆕
 - ✅ **Demo simulator** — keep for demos/onboarding (sensor spike / flood / full scenario).
 - 🔁 **User & role management** — with geographic scoping.
-- 🆕 **Hazard-type & threshold config** — admins tune thresholds per region without code changes.
-- 🆕 **Content management** — educational content, preparedness guides, blog (exists) — multilingual.
-- 🆕 **Integration settings** — SMS/WhatsApp/weather/AI keys & webhooks managed in one place.
-- 🆕 **System health & job monitoring** — cron/queue status, ingestion health.
+- ✅ **Hazard-type & threshold config** (2026-07-09) — `PATCH /api/v1/hazards/types/:code`,
+  previously only editable via the `seed-hazard-types.ts` CLI. `config.manage`-gated,
+  audited. Live-verified: patched drought's `rainfall_deficit_pct`/`dry_days`, confirmed
+  the change persisted, reverted, confirmed an unknown type 404s.
+- 🔁 **Content management** — educational content, preparedness guides, blog (exists,
+  legacy) — multilingual i18n still not started.
+- ✅ **Integration status visibility** (2026-07-09) — `GET /api/v1/admin/integrations-status`:
+  read-only, reports `configured: boolean` + non-secret metadata per integration (Arkesel,
+  Gemini, Gmail, WhatsApp, FIRMS, Copernicus, Google Maps, alert signing, Cloudinary),
+  never secret values. **Deliberately not built:** an HTTP-editable secrets table — that
+  would be a real security regression over the current env-var model for no operational
+  benefit; secrets stay in `.env`.
+- ✅ **System health & job monitoring** (2026-07-09) — `GET /api/v1/admin/system-health`:
+  DB connectivity+latency, applied-migration count/latest-apply-time, scheduled-hazard-jobs
+  enabled flag, process uptime. Both admin endpoints `config.manage`-gated (super_admin
+  only, matching this permission's existing intent), live-verified incl. a 401 check.
 
 ### Module M — Emergency Response & Coordination ✅ (2026-07-09) — backend live-verified
 Moves the platform from *warning* people to *coordinating the response* — the "preparedness

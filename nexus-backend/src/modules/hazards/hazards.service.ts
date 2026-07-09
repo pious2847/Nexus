@@ -36,6 +36,25 @@ export class HazardService {
     return repo.listHazardTypes(this.db);
   }
 
+  /** Runtime threshold/config edit (Module L) — audited since it changes evaluator behavior platform-wide. */
+  async updateHazardType(code: string, patch: repo.HazardTypePatch, actorId?: string | null) {
+    const before = await repo.updateHazardType(this.db, code, {});
+    if (!before) throw new Error('Hazard type not found');
+    const updated = await repo.updateHazardType(this.db, code, patch);
+    // resourceId is a UUID column; hazard_types.code (e.g. 'flood') isn't one, so it's
+    // carried in metadata instead — a non-UUID resourceId would just silently fail to
+    // record (AuditService swallows bad entries by design), losing this audit line.
+    await this.audit?.record({
+      actorId: actorId ?? null,
+      action: 'hazard.type.updated',
+      resourceType: 'hazard_type',
+      resourceId: null,
+      placeId: null,
+      metadata: { code, changed: Object.keys(patch), patch },
+    });
+    return updated;
+  }
+
   listEvents(filter: Parameters<typeof repo.listEvents>[1]) {
     return repo.listEvents(this.db, filter);
   }

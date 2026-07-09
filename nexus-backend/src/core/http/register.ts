@@ -25,6 +25,7 @@ import { buildDispatchRouter } from '../../modules/response/dispatch/dispatch.ro
 import { buildVolunteerRouter } from '../../modules/response/volunteers/volunteer.routes';
 import { buildAssetRouter } from '../../modules/response/volunteers/asset.routes';
 import { buildResponseTimelineRouter } from '../../modules/response/timeline.routes';
+import { buildAdminRouter } from '../../modules/admin/admin.routes';
 import { startHazardJobs } from '../../modules/hazards/hazards.jobs';
 
 export function registerCoreRoutes(app: Express): void {
@@ -55,8 +56,9 @@ export function registerCoreRoutes(app: Express): void {
   app.use('/api/v1/volunteers', buildVolunteerRouter(services));
   app.use('/api/v1/response-assets', buildAssetRouter(services));
   app.use('/api/v1/response-timeline', buildResponseTimelineRouter(services));
+  app.use('/api/v1/admin', buildAdminRouter(services));
 
-  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake, health-facilities, health-cases, safety-checkins, sos, community-focal-points, shelters, relief, dispatch, volunteers, response-assets, response-timeline (TypeScript)');
+  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake, health-facilities, health-cases, safety-checkins, sos, community-focal-points, shelters, relief, dispatch, volunteers, response-assets, response-timeline, admin (TypeScript)');
 
   // Scheduled hazard evaluators (opt-in via ENABLE_HAZARD_JOBS).
   startHazardJobs({ db: services.db, hazards: services.hazards, geography: services.geography });

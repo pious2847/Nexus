@@ -24,6 +24,13 @@ const createSchema = z.object({
   confidence: z.number().optional(),
 });
 const transitionSchema = z.object({ toState: z.enum(HAZARD_EVENT_STATES), reason: z.string().optional() });
+const hazardTypePatchSchema = z.object({
+  label: z.string().min(1).optional(),
+  category: z.string().min(1).optional(),
+  thresholds: z.record(z.string(), z.unknown()).optional(),
+  leadTimeHours: z.number().int().min(0).nullable().optional(),
+  enabled: z.boolean().optional(),
+});
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 const actorOf = (req: Request): string | null => (req as Request & { user?: { id: string } }).user?.id ?? null;
@@ -33,6 +40,23 @@ export function buildHazardsRouter({ hazards, geography, rbac }: CoreServices): 
 
   router.get('/types', async (_req, res) => {
     res.json({ success: true, data: await hazards.listHazardTypes() });
+  });
+
+  // Runtime threshold/config edit (Module L) — previously only editable via the
+  // seed-hazard-types.ts CLI. National-scoped (no resolveTargetPath — thresholds
+  // aren't a per-place resource), config.manage only (super_admin by default).
+  router.patch('/types/:code', authenticate, requirePermission(rbac, 'config.manage'), async (req, res) => {
+    const parsed = hazardTypePatchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ success: false, message: 'Invalid hazard-type patch', errors: parsed.error.flatten() });
+      return;
+    }
+    try {
+      const updated = await hazards.updateHazardType(String(req.params.code), parsed.data, actorOf(req));
+      res.json({ success: true, data: updated });
+    } catch (err) {
+      res.status(404).json({ success: false, message: (err as Error).message });
+    }
   });
 
   router.get('/events', async (req, res) => {

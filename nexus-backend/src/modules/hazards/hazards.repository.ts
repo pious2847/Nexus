@@ -67,6 +67,34 @@ export async function upsertHazardType(
   `);
 }
 
+export interface HazardTypePatch {
+  label?: string;
+  category?: string;
+  thresholds?: unknown;
+  leadTimeHours?: number | null;
+  enabled?: boolean;
+}
+
+/** Partial runtime update (Module L — previously only editable via the seed-hazard-types.ts CLI). */
+export async function updateHazardType(db: Db, code: string, patch: HazardTypePatch): Promise<HazardType | null> {
+  const sets = [];
+  if (patch.label !== undefined) sets.push(sql`label = ${patch.label}`);
+  if (patch.category !== undefined) sets.push(sql`category = ${patch.category}`);
+  if (patch.thresholds !== undefined) sets.push(sql`default_thresholds = ${JSON.stringify(patch.thresholds)}::jsonb`);
+  if (patch.leadTimeHours !== undefined) sets.push(sql`lead_time_hours = ${patch.leadTimeHours}`);
+  if (patch.enabled !== undefined) sets.push(sql`enabled = ${patch.enabled}`);
+  if (sets.length === 0) {
+    const r = await db.execute(sql`SELECT code, label, category, default_thresholds, signal_sources, evaluator_key, lead_time_hours, enabled FROM hazard_types WHERE code = ${code}`);
+    return (r.rows[0] as unknown as HazardType) ?? null;
+  }
+  sets.push(sql`updated_at = now()`);
+  const r = await db.execute(sql`
+    UPDATE hazard_types SET ${sql.join(sets, sql`, `)} WHERE code = ${code}
+    RETURNING code, label, category, default_thresholds, signal_sources, evaluator_key, lead_time_hours, enabled
+  `);
+  return (r.rows[0] as unknown as HazardType) ?? null;
+}
+
 // ── Events ───────────────────────────────────────────────────────────────────
 export interface CreateEventInput {
   hazardType: string; placeId?: string | null; state: string;
