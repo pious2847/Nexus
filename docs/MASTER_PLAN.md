@@ -771,6 +771,51 @@ Each phase is shippable and demoable on its own.
       injection that correctly triggered the evaluator to auto-raise a `severe`
       `disease_outbreak` watch (z=19) — then cleaned up. Not yet built: line-list /
       contact-tracing (optional per spec), DHIMS2 interop export.
+- [x] **Missing persons & family reunification (N3)** — live-verified 2026-07-09.
+      Report a missing person; `GET /:id/matches` runs `pg_trgm` fuzzy `similarity()`
+      (threshold `>0.3`) against N1 safety check-ins and N4 vulnerable persons, scoped to
+      the record's own place subtree, returning ranked candidates from both sources —
+      matching is candidate discovery only, a human with `missing.manage` confirms via
+      `PATCH`. No forward-only state machine (unlike dispatch/hazard events): any officer
+      can move between `missing/found/reunified/closed`, stamping `resolved_by`/
+      `resolved_at` on resolution. `missing_persons` table, migration 0019. Live-verified:
+      reported "Abena Mensa" against a seeded check-in "Abena Mensah" → matched at
+      similarity score 0.79, resolved via PATCH, scope-required 400, unauthenticated 401.
+- [x] **Rumor & misinformation control (N11)** — live-verified 2026-07-09. Rumor intake
+      (`rumor_reports`, citizens+) → officer review (`reported → reviewing →
+      confirmed_false/confirmed_true/clarified`) → an official myth-vs-fact clarification
+      (`myth_fact_entries`) that fans out to the N6 community focal-point network — the
+      exact same last-mile channel `AlertsService.publish()` uses (real SMS/email to every
+      active focal point covering the scope) — plus a public, unauthenticated feed so
+      citizens can read clarifications directly. `place_id` is nullable on a rumor report
+      (a phoned-in rumor may have no resolvable location); an unscoped rumor requires a
+      national-level `rumor.manage` grant to review. Migration 0019. Live-verified: rumor
+      reported → reviewed (`confirmed_false`) → myth-fact published with a real SMS sent to
+      a registered focal point (`channels_notified: {focalPointsNotified:1}`) → public feed
+      + detail both readable with no auth.
+- [x] **Anticipatory action / forecast-based triggers (N12)** — live-verified 2026-07-09,
+      the "predict and prevent" mission's concrete engine. A **protocol** is a pre-agreed
+      rule: if a hazard event of `hazard_type` reaches `trigger_state` in a place (or a
+      descendant place), automatically run configured `actions` — pre-alert focal points,
+      flag vulnerable persons for evacuation priority, log a relief pre-positioning
+      recommendation. **`HazardService.transition()` now calls `checkAndActivate()` after
+      every state change** (migration 0019's `(protocol_id, hazard_event_id)` unique
+      constraint guarantees fire-at-most-once per event; a Postgres `23505` on that
+      constraint is treated as a safe no-op, not an error) — genuinely automatic, not a
+      polling job. Relief pre-positioning is honestly scoped as a **logged recommendation
+      for a human to action**, not an automatic stock transfer (real inventory movement
+      would require importing the relief module — same "deliberately scoped" honesty
+      pattern as sirens/PA hardware in N6). **Live-verified as a real end-to-end trigger,
+      not just CRUD:** configured a flood/watch protocol for Tolon, raised a hazard event at
+      `predicted`, called `POST /transition` to `watch` with zero extra wiring at the call
+      site — the protocol fired automatically, sent a real SMS to a registered focal point
+      (`notified:1`), correctly found 0 active vulnerable persons in scope, and logged the
+      relief note, all visible via `GET /anticipatory/activations`.
+      Built as three independent parallel-agent worktree builds (N3/N11/N12) off one shared
+      migration+RBAC commit — first time this session all three worktrees landed with **zero
+      merge conflicts**, including on `container.ts`/`register.ts`, because agents were
+      scoped to their own new module directories only and the orchestrator (this session)
+      did all cross-cutting wiring itself afterward in one pass.
 - [ ] PWA offline-first hardening (**degraded-mode, N8**)
 - [ ] i18n (first local languages)
 
