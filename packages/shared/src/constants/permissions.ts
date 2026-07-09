@@ -52,6 +52,7 @@ export const PERMISSIONS = {
   'volunteer.manage': 'Update volunteer availability / task assignment',
   'asset.manage': 'Register / assign / update a response asset (vehicle, boat, equipment)',
   'asset.read': 'View response assets',
+  'analytics.read': 'View the executive summary / trend analytics dashboard for an area',
   'user.manage': 'Manage user accounts',
   'role.assign': 'Assign roles to users',
   'org.manage': 'Manage organizations',
@@ -78,6 +79,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'shelter.read', 'shelter.manage', 'relief.read', 'relief.manage',
     'dispatch.create', 'dispatch.read', 'dispatch.manage',
     'volunteer.read', 'volunteer.manage', 'asset.manage', 'asset.read',
+    'analytics.read',
   ],
   regional_coordinator: [
     'hazard.event.read', 'hazard.event.create', 'hazard.event.transition',
@@ -92,6 +94,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'shelter.read', 'shelter.manage', 'relief.read', 'relief.manage',
     'dispatch.create', 'dispatch.read', 'dispatch.manage',
     'volunteer.read', 'volunteer.manage', 'asset.manage', 'asset.read',
+    'analytics.read',
   ],
   district_officer: [
     'hazard.event.read', 'hazard.event.create',
@@ -106,6 +109,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'shelter.create', 'shelter.read', 'shelter.manage', 'relief.read', 'relief.manage',
     'dispatch.create', 'dispatch.read', 'dispatch.manage',
     'volunteer.create', 'volunteer.read', 'volunteer.manage', 'asset.manage', 'asset.read',
+    'analytics.read',
   ],
   // Field workers register + view (geo-scoped to their assigned place, like reports) —
   // but status/consent changes (e.g. marking someone deceased) stay with officers+.
@@ -136,8 +140,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
   ngo_partner: [
     'data.dataset.read', 'data.request.create', 'report.read', 'response.manage',
     'shelter.read', 'relief.read', 'relief.manage', 'dispatch.read', 'volunteer.read', 'asset.read',
+    'analytics.read',
   ],
-  researcher: ['data.dataset.read', 'data.request.create'],
+  researcher: ['data.dataset.read', 'data.request.create', 'analytics.read'],
   data_consumer: ['data.dataset.read'],
   // Citizens can send an SOS but not browse others' — that's an officer/moderator view.
   // They can also register themselves as a volunteer.

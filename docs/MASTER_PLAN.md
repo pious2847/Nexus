@@ -251,10 +251,24 @@ The HDX-style data-sharing platform — our path to national relevance & sustain
 
 ### Module K — Analytics, Reports & Decision Support 🔁
 - ✅ **District PDF/CSV reports** + trend charts → 🔁 national + regional + district levels.
-- 🆕 **Executive dashboards** — national situational overview for agencies/policymakers.
+- ✅ **Executive dashboard** (2026-07-09) — `GET /api/v1/analytics/executive-summary?scope=<placeId>`:
+  active hazards by severity, 30-day incident-report totals (verified/pending), 30-day
+  disease-case counts by disease, dispatch-task counts by status, 30-day SOS stats (open/
+  acknowledged/avg-ack-seconds), shelter occupancy (open/full/closed + capacity/occupancy
+  totals), active vulnerable-persons count — one Promise.all-ed cross-module read over 7
+  existing tables, geo-scoped via the same ltree subtree pattern as everywhere else. New
+  `analytics.read` permission granted to national_agency/regional_coordinator/
+  district_officer/ngo_partner/researcher.
+- ✅ **Impact & response metrics** — folded into the executive dashboard above (dispatch
+  status counts, SOS ack latency, shelter/relief occupancy) rather than a separate feature.
 - 🔁 **Community/district health & risk scores** — generalized composite risk index per place.
-- 🆕 **Trend analytics** — seasonality, year-over-year, hotspot detection across hazards.
-- 🆕 **Impact & response metrics** — response times, coverage, outcomes (accountability).
+- ✅ **Trend analytics** (2026-07-09) — `GET /api/v1/analytics/trends?months=&scope=`: monthly
+  hazard-event counts by type, national rollup when `scope` omitted (requires unscoped
+  `analytics.read`, i.e. national-level roles). Live-verified: full executive-summary against
+  seeded Tolon test data (all 7 stat groups matched expected counts exactly), scope-required
+  400, unauthenticated 401, out-of-range `months` 400, national no-scope trends 200 for
+  super_admin. Test rows seeded via direct SQL (not the API) to avoid triggering SOS's real
+  SMS fan-out to responders — this is a pure read-aggregation feature, not a re-test of SOS.
 
 ### Module L — Admin, Config & Platform Ops 🔁🆕
 - ✅ **Demo simulator** — keep for demos/onboarding (sensor spike / flood / full scenario).

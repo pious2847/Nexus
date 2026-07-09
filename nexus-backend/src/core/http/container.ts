@@ -27,6 +27,7 @@ import { VolunteerService } from '../../modules/response/volunteers/volunteer.se
 import { AssetService } from '../../modules/response/volunteers/asset.service';
 import { ResponseTimelineService } from '../../modules/response/timeline.service';
 import { SystemHealthService } from '../../modules/admin/system-health.service';
+import { AnalyticsService } from '../../modules/analytics/analytics.service';
 
 export interface CoreServices {
   db: Db;
@@ -52,6 +53,7 @@ export interface CoreServices {
   assets: AssetService;
   responseTimeline: ResponseTimelineService;
   systemHealth: SystemHealthService;
+  analytics: AnalyticsService;
 }
 
 export function createCoreServices(pool: Pool): CoreServices {
@@ -87,5 +89,6 @@ export function createCoreServices(pool: Pool): CoreServices {
     assets: new AssetService(db, audit),
     responseTimeline: new ResponseTimelineService(db),
     systemHealth: new SystemHealthService(db),
+    analytics: new AnalyticsService(db),
   };
 }
