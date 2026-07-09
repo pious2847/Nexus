@@ -905,6 +905,36 @@ Each phase is shippable and demoable on its own.
       entry above), were the third batch of parallel-agent worktree builds this
       session — again zero merge conflicts, same directory-scoped-agents +
       centralized-orchestrator-wiring pattern established in the N3/N11/N12 batch.
+- [x] **Common Operating Picture + Incident Command (N14)** — live-verified 2026-07-09.
+      `GET /api/v1/hazards/events/:id/cop` — a single request aggregating everything
+      already linked to one hazard event: incident reports (promoted + in-area),
+      dispatch task counts by status, safety-checkin counts by status, SOS counts,
+      shelter occupancy, relief distributions, open rumors, the N15 damage-assessment
+      situation report (reused directly from `AssessmentService`, not reimplemented),
+      and the active Incident Command System role roster. `incident_command_roles`
+      table (migration 0022) — `POST/DELETE .../cop/roles` assign/relieve named ICS
+      roles (incident commander, operations, logistics, etc.); a unique partial index
+      on `(hazard_event_id, role_title) WHERE relieved_at IS NULL` enforces at most one
+      active holder per role per event, with reassignment auto-relieving the previous
+      holder. `command.read`/`command.manage`-gated, scoped to the event's own place.
+      Live-verified: seeded one row in each of 4 event-linked tables, confirmed the COP
+      response aggregated all of them correctly in one call, assigned then relieved an
+      Incident Commander role, 401/404 checks, full cleanup.
+- [x] **Dynamic evacuation routing & nearest safe place (N7)** — live-verified 2026-07-09,
+      **honestly scoped**: `GET /api/v1/evacuation/nearest-safe-place?lng=&lat=` (public,
+      no auth) ranks nearby open shelters + active health facilities by distance, but
+      DEPRIORITIZES (not silently drops) any whose own place currently has an active
+      severe/extreme hazard event — sending someone *into* the hazard defeats the
+      point. Includes a straight-line compass heading + distance (`bearing.ts`, pure,
+      10 unit tests). **What this is NOT**: true road-network routing avoiding
+      flooded/on-fire road segments — that needs a Ghana road-network dataset (never
+      ingested) and the `pgrouting` extension (confirmed not installed on the current
+      Neon branch, checked directly rather than assumed). Documented as a real future
+      upgrade, not claimed as done — same honesty pattern as N6's sirens/PA hardware
+      and N12's relief pre-positioning. Live-verified: a shelter registered inside an
+      active severe-flood district was correctly flagged `hazard_affected: true` with
+      the affecting hazard type, ranked appropriately, and returned a correct
+      bearing/distance/compass-point heading.
 - [ ] PWA offline-first hardening (**degraded-mode, N8**)
 - [ ] i18n (first local languages)
 
