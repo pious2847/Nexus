@@ -4,6 +4,11 @@
  * is broader than the vulnerable-persons registry (field_worker can read too,
  * for the map layer), but registration/management still requires geo-scoped
  * RBAC (district_officer+ create; regional/national oversight can manage).
+ *
+ * N16 — live capacity & mass-casualty coordination additions:
+ *   POST /:id/capacity              file a new capacity report (health.facility.manage, scoped)
+ *   GET  /:id/capacity              latest capacity report, 200 {data: null} if none filed yet (health.facility.read, scoped)
+ *   GET  /nearest-with-capacity     PUBLIC, no auth — nearest facility with a capacity report meeting filters (?lng=&lat=&minBeds=&status=&limit=)
  */
 import { Router, type Request, type RequestHandler, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
@@ -42,6 +47,23 @@ const updateSchema = z.object({
   status: z.enum(STATUS).optional(),
 });
 
+const CAPACITY_STATUS = ['normal', 'strained', 'overwhelmed', 'closed'] as const;
+
+const capacityReportSchema = z.object({
+  bedsAvailable: z.number().int().min(0).optional(),
+  bloodUnitsAvailable: z.number().int().min(0).optional(),
+  ambulancesAvailable: z.number().int().min(0).optional(),
+  status: z.enum(CAPACITY_STATUS),
+});
+
+const nearestWithCapacitySchema = z.object({
+  lng: z.coerce.number().min(-180).max(180),
+  lat: z.coerce.number().min(-90).max(90),
+  minBeds: z.coerce.number().int().min(0).optional(),
+  status: z.enum(CAPACITY_STATUS).optional(),
+  limit: z.coerce.number().int().min(1).max(20).optional(),
+});
+
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 const actorOf = (req: Request): string => (req as Request & { user?: { id: string } }).user?.id ?? '';
 
@@ -61,6 +83,29 @@ type HealthFacilityRouterDeps = Pick<CoreServices, 'geography' | 'rbac'> & { hea
 
 export function buildHealthFacilityRouter({ healthFacilities, geography, rbac }: HealthFacilityRouterDeps): Router {
   const router = Router();
+
+  // Public, read-only "nearest facility with capacity" lookup — no auth/RBAC.
+  // Registered before `router.use(authenticate)` so it never hits that
+  // middleware (mirrors shelter.routes.ts's /nearest — routing casualties to
+  // a facility that actually has room is the same openness level as routing
+  // people to an open shelter).
+  router.get('/nearest-with-capacity', async (req, res) => {
+    const parsed = nearestWithCapacitySchema.safeParse({
+      lng: req.query.lng,
+      lat: req.query.lat,
+      minBeds: req.query.minBeds,
+      status: req.query.status,
+      limit: req.query.limit,
+    });
+    if (!parsed.success) {
+      res.status(400).json({ success: false, message: 'lng and lat query params are required', errors: parsed.error.flatten() });
+      return;
+    }
+    const { lng, lat, minBeds, status, limit } = parsed.data;
+    const rows = await healthFacilities.findNearestWithCapacity({ lng, lat }, { minBeds, status }, limit ?? 5);
+    res.json({ success: true, count: rows.length, data: rows });
+  });
+
   router.use(authenticate);
 
   // Resolve the target place ONCE (from placeId, or lng/lat via reverse geocode) so
@@ -147,6 +192,43 @@ export function buildHealthFacilityRouter({ healthFacilities, geography, rbac }:
       } catch (err) {
         res.status(404).json({ success: false, message: (err as Error).message });
       }
+    },
+  );
+
+  // File a new live capacity report — perm health.facility.manage, scoped to the facility's place.
+  router.post(
+    '/:id/capacity',
+    requirePermission(rbac, MANAGE_PERM, (req) => healthFacilities.facilityPlacePath(String(req.params.id))),
+    async (req, res) => {
+      const parsed = capacityReportSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ success: false, message: 'Invalid capacity report', errors: parsed.error.flatten() });
+        return;
+      }
+      const facility = await healthFacilities.getFacility(String(req.params.id));
+      if (!facility) {
+        res.status(404).json({ success: false, message: 'Not found' });
+        return;
+      }
+      const report = await healthFacilities.reportCapacity(String(req.params.id), parsed.data, actorOf(req));
+      res.status(201).json({ success: true, data: report });
+    },
+  );
+
+  // Latest capacity report — perm health.facility.read, scoped. A facility with
+  // zero reports is a valid state (200 {data: null}), not an error; only an
+  // unknown facility id 404s.
+  router.get(
+    '/:id/capacity',
+    requirePermission(rbac, READ_PERM, (req) => healthFacilities.facilityPlacePath(String(req.params.id))),
+    async (req, res) => {
+      const facility = await healthFacilities.getFacility(String(req.params.id));
+      if (!facility) {
+        res.status(404).json({ success: false, message: 'Not found' });
+        return;
+      }
+      const report = await healthFacilities.getCapacity(String(req.params.id));
+      res.json({ success: true, data: report });
     },
   );
 
