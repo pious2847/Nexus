@@ -102,33 +102,36 @@ export class FloodEvaluator {
       const currentMax = Math.max(...forecast.days.map((d) => d.dischargeM3s));
 
       const cls = classifyFloodRisk(currentMax, p90, p95, p98);
-      if (!cls.severity) continue;
 
-      const existing = await findOpenAutoEvent(db, 'flood', t.placeId, 24);
-      let eventId: string;
-      if (existing) {
-        eventId = existing.id;
-        updated.push(eventId);
-      } else {
-        const event = await hazards.raiseEvent(
-          {
-            hazardType: 'flood',
-            placeId: t.placeId,
-            title: `Flood watch — ${t.name}`,
-            description: `Forecast river discharge ${currentMax}m³/s vs. historical p90=${p90}, p95=${p95}, p98=${p98} (${HISTORY_YEARS}yr record).`,
-            state: 'watch',
-            severity: cls.severity,
-            certainty: 'likely',
-            urgency: 'expected',
-            confidence: 0.65,
-            source: 'auto',
-          },
-          null,
-        );
-        eventId = event.id;
-        created.push(eventId);
+      let eventId: string | null = null;
+      if (cls.severity) {
+        const existing = await findOpenAutoEvent(db, 'flood', t.placeId, 24);
+        if (existing) {
+          eventId = existing.id;
+          updated.push(eventId);
+        } else {
+          const event = await hazards.raiseEvent(
+            {
+              hazardType: 'flood',
+              placeId: t.placeId,
+              title: `Flood watch — ${t.name}`,
+              description: `Forecast river discharge ${currentMax}m³/s vs. historical p90=${p90}, p95=${p95}, p98=${p98} (${HISTORY_YEARS}yr record).`,
+              state: 'watch',
+              severity: cls.severity,
+              certainty: 'likely',
+              urgency: 'expected',
+              confidence: 0.65,
+              source: 'auto',
+            },
+            null,
+          );
+          eventId = event.id;
+          created.push(eventId);
+        }
       }
 
+      // Log every successfully-evaluated target, not just alert-worthy ones (Module I
+      // gap) — see drought.ts's identical comment for the reasoning.
       await hazards.addPrediction({
         hazardType: 'flood',
         placeId: t.placeId,

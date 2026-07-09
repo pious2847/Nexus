@@ -61,33 +61,36 @@ export class RainfallEvaluator {
     for (const t of targets) {
       const forecast = await fetchDailyPrecip(t.lat, t.lng);
       const cls = classifyRainfall(forecast.maxMm);
-      if (!cls.severity) continue; // below advisory threshold
 
-      const existing = await findOpenAutoEvent(db, 'heavy_rainfall', t.placeId, 12);
-      let eventId: string;
-      if (existing) {
-        eventId = existing.id;
-        updated.push(eventId);
-      } else {
-        const event = await hazards.raiseEvent(
-          {
-            hazardType: 'heavy_rainfall',
-            placeId: t.placeId,
-            title: `Heavy rainfall forecast — ${t.name}`,
-            description: `Forecast up to ${cls.factors.rainfall_mm_24h} mm in 24h.`,
-            state: 'watch',
-            severity: cls.severity,
-            certainty: 'expected',
-            urgency: 'future',
-            confidence: 0.6,
-            source: 'auto',
-          },
-          null,
-        );
-        eventId = event.id;
-        created.push(eventId);
+      let eventId: string | null = null;
+      if (cls.severity) {
+        const existing = await findOpenAutoEvent(db, 'heavy_rainfall', t.placeId, 12);
+        if (existing) {
+          eventId = existing.id;
+          updated.push(eventId);
+        } else {
+          const event = await hazards.raiseEvent(
+            {
+              hazardType: 'heavy_rainfall',
+              placeId: t.placeId,
+              title: `Heavy rainfall forecast — ${t.name}`,
+              description: `Forecast up to ${cls.factors.rainfall_mm_24h} mm in 24h.`,
+              state: 'watch',
+              severity: cls.severity,
+              certainty: 'expected',
+              urgency: 'future',
+              confidence: 0.6,
+              source: 'auto',
+            },
+            null,
+          );
+          eventId = event.id;
+          created.push(eventId);
+        }
       }
 
+      // Log every successfully-evaluated target, not just alert-worthy ones (Module I
+      // gap) — see drought.ts's identical comment for the reasoning.
       await hazards.addPrediction({
         hazardType: 'heavy_rainfall',
         placeId: t.placeId,

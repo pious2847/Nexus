@@ -34,12 +34,17 @@ import { buildAnticipatoryRouter } from '../../modules/anticipatory/anticipatory
 import { buildBadgesRouter } from '../../modules/reports/badges.routes';
 import { buildAssessmentRouter } from '../../modules/assessments/assessment.routes';
 import { buildAdminUsersRouter } from '../../modules/admin/users/admin-users.routes';
+import { buildOrganizationsRouter } from '../../modules/admin/organizations/organizations.routes';
 import { startHazardJobs } from '../../modules/hazards/hazards.jobs';
 
 export function registerCoreRoutes(app: Express): void {
   // Reuse the legacy app's pg Pool so we don't open a second connection pool.
   const { getPool } = require('../../config/database') as { getPool: () => import('pg').Pool };
   const services = createCoreServices(getPool());
+  // Exposed for legacy CJS routes that need a TS-core service without being rewritten
+  // wholesale (e.g. the existing WhatsApp webhook dispatching multi-hazard REPORT
+  // commands into ReportsService) — standard Express app-wide-service pattern.
+  app.locals.coreServices = services;
 
   app.use('/api/v1/auth-v2', buildAuthRouter(services));
   app.use('/api/v1/geography', buildGeographyRouter(services));
@@ -73,8 +78,9 @@ export function registerCoreRoutes(app: Express): void {
   app.use('/api/v1/badges', buildBadgesRouter(services));
   app.use('/api/v1/assessments', buildAssessmentRouter(services));
   app.use('/api/v1/admin/users', buildAdminUsersRouter(services));
+  app.use('/api/v1/admin/organizations', buildOrganizationsRouter(services));
 
-  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake, health-facilities, health-cases, safety-checkins, sos, community-focal-points, shelters, relief, dispatch, volunteers, response-assets, response-timeline, admin, analytics, missing-persons, rumors, myth-facts, anticipatory, badges, assessments, admin-users (TypeScript)');
+  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake, health-facilities, health-cases, safety-checkins, sos, community-focal-points, shelters, relief, dispatch, volunteers, response-assets, response-timeline, admin, analytics, missing-persons, rumors, myth-facts, anticipatory, badges, assessments, admin-users, admin-organizations (TypeScript)');
 
   // Scheduled hazard evaluators (opt-in via ENABLE_HAZARD_JOBS).
   startHazardJobs({ db: services.db, hazards: services.hazards, geography: services.geography });

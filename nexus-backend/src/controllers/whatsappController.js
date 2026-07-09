@@ -25,7 +25,7 @@ async function receive(req, res, next) {
     if (!message || message.type !== 'text') return;
 
     const phoneNumberId = value.metadata?.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const replyText = await whatsappService.handleIncoming(message, contact);
+    const replyText = await whatsappService.handleIncoming(message, contact, req.app.locals.coreServices);
     await whatsappService.sendMessage(phoneNumberId, message.from, replyText);
   } catch (err) {
     console.error('[WhatsApp] receive error:', err.message);

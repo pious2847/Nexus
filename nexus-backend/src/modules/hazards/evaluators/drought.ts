@@ -110,33 +110,38 @@ export class DroughtEvaluator {
       const normal = round2(yearly.reduce((a, b) => a + b, 0) / yearly.length);
       const deficit = deficitPercent(current.total, normal);
       const cls = classifyDrought(deficit);
-      if (!cls.severity) continue;
 
-      const existing = await findOpenAutoEvent(db, 'drought', t.placeId, 24 * 7); // weekly cadence
-      let eventId: string;
-      if (existing) {
-        eventId = existing.id;
-        updated.push(eventId);
-      } else {
-        const event = await hazards.raiseEvent(
-          {
-            hazardType: 'drought',
-            placeId: t.placeId,
-            title: `Drought watch — ${t.name}`,
-            description: `${WINDOW_DAYS}-day rainfall ${current.total}mm vs. ${HISTORY_YEARS}-yr normal ${normal}mm (${deficit}% deficit).`,
-            state: 'watch',
-            severity: cls.severity,
-            certainty: 'likely',
-            urgency: 'future', // slow-onset
-            confidence: round2(0.4 + yearly.length * 0.15), // more historical years -> more confidence
-            source: 'auto',
-          },
-          null,
-        );
-        eventId = event.id;
-        created.push(eventId);
+      let eventId: string | null = null;
+      if (cls.severity) {
+        const existing = await findOpenAutoEvent(db, 'drought', t.placeId, 24 * 7); // weekly cadence
+        if (existing) {
+          eventId = existing.id;
+          updated.push(eventId);
+        } else {
+          const event = await hazards.raiseEvent(
+            {
+              hazardType: 'drought',
+              placeId: t.placeId,
+              title: `Drought watch — ${t.name}`,
+              description: `${WINDOW_DAYS}-day rainfall ${current.total}mm vs. ${HISTORY_YEARS}-yr normal ${normal}mm (${deficit}% deficit).`,
+              state: 'watch',
+              severity: cls.severity,
+              certainty: 'likely',
+              urgency: 'future', // slow-onset
+              confidence: round2(0.4 + yearly.length * 0.15), // more historical years -> more confidence
+              source: 'auto',
+            },
+            null,
+          );
+          eventId = event.id;
+          created.push(eventId);
+        }
       }
 
+      // Log every successfully-evaluated target, not just alert-worthy ones (Module I
+      // gap) — a complete forecast-vs-actual dataset (including "no risk" results,
+      // hazardEventId: null) is what future ML training needs; only genuinely
+      // insufficient-data cases (the `skipped` continue above) are left unlogged.
       await hazards.addPrediction({
         hazardType: 'drought',
         placeId: t.placeId,

@@ -23,14 +23,16 @@ async function sendMessage(phoneNumberId, to, text) {
   return data;
 }
 
-async function handleIncoming(message, contact) {
-  const body = (message.text?.body || '').trim().toUpperCase();
+async function handleIncoming(message, contact, coreServices) {
+  const rawBody = (message.text?.body || '').trim();
+  const body = rawBody.toUpperCase();
   const parts = body.split(/\s+/);
   const cmd = parts[0];
 
   if (cmd === 'HELP') {
     return `N.E.X.U.S. Commands:
 REPORT DUMP [description] — report an illegal dump site
+REPORT <type>, <place>, <description> — report a flood/fire/outbreak/other hazard, e.g. REPORT FLOOD, TOLON, Water rising near the market
 FLOOD [district] — flood risk & rainfall for a district
 HEALTH [district] — community health score
 TOILETS NEAR [lat] [lon] — 3 nearest registered toilets
@@ -49,6 +51,33 @@ HELP — this message`;
       reporter_phone: contact?.wa_id || message.from,
     });
     return `Dump site reported. Thank you! Our team will investigate. Reference: ${new Date().toISOString().slice(0,10)}`;
+  }
+
+  // Multi-hazard citizen incident report (Module C gap) — REPORT <type>, <place>,
+  // <description>. Same channel-agnostic grammar/parser as the SMS intake
+  // (modules/reports/sms/report-sms.parser.ts), submitted through the real
+  // multi-hazard ReportsService rather than the legacy sanitation-only dump-site
+  // path above. `coreServices` is stashed on `app.locals` by
+  // core/http/register.ts; if it's unavailable for any reason this just falls
+  // through to "Unknown command" below rather than throwing.
+  if (cmd === 'REPORT' && coreServices) {
+    const { parseSmsReportCommand, buildConfirmationText } = require('../modules/reports/sms/report-sms.parser');
+    const parsed = parseSmsReportCommand(rawBody);
+    if (parsed.ok) {
+      const resolved = await coreServices.geography.resolveDistrict(parsed.placeText);
+      const report = await coreServices.reports.submit(
+        {
+          hazardType: parsed.hazardType,
+          placeId: resolved?.placeId ?? null,
+          title: (parsed.description.split(/\r?\n/)[0].trim() || 'Incident reported via WhatsApp').slice(0, 120),
+          description: parsed.description,
+          source: 'whatsapp',
+          reporterPhone: contact?.wa_id || message.from,
+        },
+        null, // no authenticated user — anonymous/phone-only WhatsApp reporter
+      );
+      return buildConfirmationText(resolved?.name ?? null, report.id);
+    }
   }
 
   if (cmd === 'FLOOD' && parts[1]) {
