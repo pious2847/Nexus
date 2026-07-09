@@ -7,6 +7,7 @@ import type { Db } from '../../shared/db';
 import type { AuditRecorder } from '../../core/audit/audit.service';
 import type { GeographyService } from '../../core/geography/geography.service';
 import type { HazardService } from '../hazards/hazards.service';
+import type { BadgeService } from './badges.service';
 import * as repo from './reports.repository';
 import type { IncidentReport } from './reports.repository';
 import { applyReputationDelta, computeInitialConfidence, corroborationConfidence } from './reports.trust';
@@ -32,6 +33,7 @@ export class ReportsService {
     private readonly geography: GeographyService,
     private readonly hazards: HazardService,
     private readonly audit?: AuditRecorder,
+    private readonly badges?: BadgeService,
   ) {}
 
   getReport(id: string) {
@@ -112,6 +114,17 @@ export class ReportsService {
     if (report.reporter_id) {
       const rep = await repo.getReputation(this.db, report.reporter_id);
       await repo.setReputation(this.db, report.reporter_id, applyReputationDelta(rep, decision));
+
+      // Light gamification (Module C): a verification is the only event that can newly
+      // qualify a reporter for a badge (raises both verified-count and reputation).
+      // Never let a badge-award failure block the actual verification decision.
+      if (decision === 'verified') {
+        try {
+          await this.badges?.checkAndAward(report.reporter_id);
+        } catch (err) {
+          console.error('[badges] checkAndAward failed for user', report.reporter_id, (err as Error).message);
+        }
+      }
     }
 
     await this.audit?.record({

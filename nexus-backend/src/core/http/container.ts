@@ -32,6 +32,7 @@ import { MissingPersonsService } from '../../modules/missing/missing.service';
 import { RumorService } from '../../modules/rumors/rumor.service';
 import { MythFactService } from '../../modules/rumors/mythfact.service';
 import { AnticipatoryService } from '../../modules/anticipatory/anticipatory.service';
+import { BadgeService } from '../../modules/reports/badges.service';
 
 export interface CoreServices {
   db: Db;
@@ -62,6 +63,7 @@ export interface CoreServices {
   rumors: RumorService;
   mythFacts: MythFactService;
   anticipatory: AnticipatoryService;
+  badges: BadgeService;
 }
 
 export function createCoreServices(pool: Pool): CoreServices {
@@ -77,6 +79,7 @@ export function createCoreServices(pool: Pool): CoreServices {
   // in turn means its own deps (focalPoints, vulnerablePersons) must be constructed first.
   const anticipatory = new AnticipatoryService(db, geography, audit, focalPoints, vulnerablePersons);
   const hazards = new HazardService(db, audit, anticipatory);
+  const badges = new BadgeService(db, audit);
   return {
     db,
     audit,
@@ -88,8 +91,9 @@ export function createCoreServices(pool: Pool): CoreServices {
     dispatch,
     vulnerablePersons,
     anticipatory,
+    badges,
     auth: new AuthService(db, process.env.JWT_SECRET ?? '', undefined, audit),
-    reports: new ReportsService(db, geography, hazards, audit),
+    reports: new ReportsService(db, geography, hazards, audit, badges),
     alerts: new AlertsService(db, rbac, notifications, audit, undefined, undefined, undefined, focalPoints),
     hazardMap: new HazardMapService(db),
     healthFacilities: new HealthFacilityService(db, geography, audit),

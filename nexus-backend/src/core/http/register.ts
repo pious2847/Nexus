@@ -31,6 +31,7 @@ import { buildMissingPersonsRouter } from '../../modules/missing/missing.routes'
 import { buildRumorRouter } from '../../modules/rumors/rumor.routes';
 import { buildMythFactRouter } from '../../modules/rumors/mythfact.routes';
 import { buildAnticipatoryRouter } from '../../modules/anticipatory/anticipatory.routes';
+import { buildBadgesRouter } from '../../modules/reports/badges.routes';
 import { startHazardJobs } from '../../modules/hazards/hazards.jobs';
 
 export function registerCoreRoutes(app: Express): void {
@@ -67,8 +68,9 @@ export function registerCoreRoutes(app: Express): void {
   app.use('/api/v1/rumors', buildRumorRouter(services));
   app.use('/api/v1/myth-facts', buildMythFactRouter(services));
   app.use('/api/v1/anticipatory', buildAnticipatoryRouter(services));
+  app.use('/api/v1/badges', buildBadgesRouter(services));
 
-  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake, health-facilities, health-cases, safety-checkins, sos, community-focal-points, shelters, relief, dispatch, volunteers, response-assets, response-timeline, admin, analytics, missing-persons, rumors, myth-facts, anticipatory (TypeScript)');
+  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake, health-facilities, health-cases, safety-checkins, sos, community-focal-points, shelters, relief, dispatch, volunteers, response-assets, response-timeline, admin, analytics, missing-persons, rumors, myth-facts, anticipatory, badges (TypeScript)');
 
   // Scheduled hazard evaluators (opt-in via ENABLE_HAZARD_JOBS).
   startHazardJobs({ db: services.db, hazards: services.hazards, geography: services.geography });

@@ -172,8 +172,25 @@ The "always be collecting clean data" engine — includes citizen crowdsourcing.
 - 🔁 **Field assessments** — generalize sanitation/flood assessments into reusable, form-driven assessments per hazard type, with photos (Cloudinary), GPS, offline capture.
 - 🆕 **Citizen incident reports** — anyone can report a flood/fire/outbreak/sanitation issue via PWA, SMS, WhatsApp, or (future) voice note in local language. Geo-tagged, photo-attachable.
 - 🆕 **Report verification workflow** — Ushahidi-style: submitted → triaged → verified/rejected → promoted to a hazard event if warranted. Prevents misinformation. **Trust model (decided):** (1) officers/moderators verify; (2) **reputation score** per citizen so reliable reporters get fast-tracked; (3) **corroboration threshold** — multiple independent reports of the same incident auto-raise confidence; (4) **community moderators** — trusted locals (assembly members, teachers) can pre-verify in their area.
-- 🆕 **Light gamification** — badges & recognition for verified contributions (leaderboards optional). **No cash/airtime rewards** — deliberately, to avoid incentivizing fake reports in a data-collection system.
-- 🆕 **Historical data ingestion** — bulk import past events (floods, outbreaks, bushfires, droughts) from NADMO/GHS/GMet records, CSV/Excel upload, with source attribution.
+- ✅ **Light gamification** (2026-07-09) — `badges`/`user_badges` tables (migration 0020), 5
+  seeded badges (verified-count milestones 1/5/20 + reputation-score thresholds 50/100).
+  `BadgeService.checkAndAward()` hooks into `ReportsService.review()` — a verification is
+  the only event that can newly qualify a reporter, so it's checked right there, wrapped in
+  try/catch so a badge-award failure never blocks the actual verification decision (same
+  defensive pattern as N12's `checkAndActivate` hook). Award is idempotent via a
+  `(user_id, badge_id)` unique constraint, same fire-at-most-once mechanism as N12's
+  `protocol_activations`. `GET /api/v1/badges` (catalog) and `GET /api/v1/badges/leaderboard`
+  (optional geo scope) are public — recognition is meant to be visible; `GET
+  /api/v1/badges/me` requires auth. **No cash/airtime rewards**, per the decided trust
+  model. Live-verified end-to-end: seeded a fresh test citizen (reputation 0), verified one
+  of their reports via the real `/incident-reports/:id/review` endpoint, confirmed the
+  `first_report` badge was awarded automatically with no extra call, reputation correctly
+  incremented to 5, leaderboard entry correct, no duplicate award row. Cleaned up after.
+- ⏸️ **Historical data ingestion** (bulk import past events, CSV/Excel, source attribution)
+  — **deliberately not built now.** MASTER_PLAN §11 explicitly places this under **Phase 3**
+  (Data Hub + ML service), not Phase 2 — building it now would repeat the exact "roadmap
+  drift" this project already corrected once (2026-07-03 note above). Left for when Phase 3
+  begins alongside the rest of the Data Hub (Module G).
 - 🆕 **Structured data schemas per hazard** — every record captures the fields researchers actually need (date, location to village level, severity, casualties, damage, response, source) so exports are valuable.
 - 🆕 **Data quality & dedup** — validation rules, duplicate detection, confidence/verification flags on every record (HDX-style QA mindset).
 - 🔁 **Sensor/IoT ingestion** — keep existing sensor endpoints; generalize to accept any device type (waste-level, water-level, weather, air quality) with a documented device API.

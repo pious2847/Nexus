@@ -141,6 +141,13 @@
       "when": 1753056000000,
       "tag": "0019_missing_persons_rumor_anticipatory",
       "breakpoints": false
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1753142400000,
+      "tag": "0020_badges",
+      "breakpoints": false
     }
   ]
 }
