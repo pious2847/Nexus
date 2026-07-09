@@ -33,6 +33,8 @@ import { RumorService } from '../../modules/rumors/rumor.service';
 import { MythFactService } from '../../modules/rumors/mythfact.service';
 import { AnticipatoryService } from '../../modules/anticipatory/anticipatory.service';
 import { BadgeService } from '../../modules/reports/badges.service';
+import { AssessmentService } from '../../modules/assessments/assessment.service';
+import { AdminUsersService } from '../../modules/admin/users/admin-users.service';
 
 export interface CoreServices {
   db: Db;
@@ -64,6 +66,8 @@ export interface CoreServices {
   mythFacts: MythFactService;
   anticipatory: AnticipatoryService;
   badges: BadgeService;
+  assessments: AssessmentService;
+  adminUsers: AdminUsersService;
 }
 
 export function createCoreServices(pool: Pool): CoreServices {
@@ -110,5 +114,7 @@ export function createCoreServices(pool: Pool): CoreServices {
     missingPersons: new MissingPersonsService(db, geography, audit),
     rumors: new RumorService(db, geography, audit),
     mythFacts: new MythFactService(db, geography, focalPoints, undefined, undefined),
+    assessments: new AssessmentService(db, geography, audit),
+    adminUsers: new AdminUsersService(db, audit),
   };
 }
