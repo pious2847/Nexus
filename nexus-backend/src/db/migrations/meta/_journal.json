@@ -120,6 +120,13 @@
       "when": 1752796800000,
       "tag": "0016_sos_alerts",
       "breakpoints": false
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1752883200000,
+      "tag": "0017_community_focal_points",
+      "breakpoints": false
     }
   ]
 }

@@ -19,6 +19,7 @@ import { HealthFacilityService } from '../../modules/health/facilities/health-fa
 import { DiseaseCaseService } from '../../modules/health/cases/disease-case.service';
 import { SafetyCheckinService } from '../../modules/safety/checkin.service';
 import { SosService } from '../../modules/safety/sos.service';
+import { FocalPointService } from '../../modules/alerts/focal/focal-point.service';
 
 export interface CoreServices {
   db: Db;
@@ -36,6 +37,7 @@ export interface CoreServices {
   diseaseCases: DiseaseCaseService;
   safetyCheckins: SafetyCheckinService;
   sos: SosService;
+  focalPoints: FocalPointService;
 }
 
 export function createCoreServices(pool: Pool): CoreServices {
@@ -45,6 +47,7 @@ export function createCoreServices(pool: Pool): CoreServices {
   const hazards = new HazardService(db, audit);
   const rbac = new RbacService(db);
   const notifications = new NotificationsService(db);
+  const focalPoints = new FocalPointService(db, geography, audit);
   return {
     db,
     audit,
@@ -52,9 +55,10 @@ export function createCoreServices(pool: Pool): CoreServices {
     hazards,
     rbac,
     notifications,
+    focalPoints,
     auth: new AuthService(db, process.env.JWT_SECRET ?? '', undefined, audit),
     reports: new ReportsService(db, geography, hazards, audit),
-    alerts: new AlertsService(db, rbac, notifications, audit),
+    alerts: new AlertsService(db, rbac, notifications, audit, undefined, undefined, undefined, focalPoints),
     hazardMap: new HazardMapService(db),
     vulnerablePersons: new VulnerablePersonsService(db, geography, audit),
     healthFacilities: new HealthFacilityService(db, geography, audit),

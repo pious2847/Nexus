@@ -61,6 +61,17 @@ export function buildAlertsRouter({ alerts, rbac }: CoreServices): Router {
     }
   });
 
+  // Printable community notice-board sheet (spec 02 N6) — no auth, plain HTML
+  // (not JSON) so it can be opened and printed directly from a browser.
+  router.get('/:id/notice-sheet', async (req, res) => {
+    const html = await alerts.noticeSheetHtml(String(req.params.id));
+    if (!html) {
+      res.status(404).send('Alert not found or not yet published.');
+      return;
+    }
+    res.type('html').send(html);
+  });
+
   // Draft from a hazard event — requires at least advisory publish rights (geo-scoped later).
   router.post('/from-event', authenticate, requirePermission(rbac, 'alert.publish.advisory'), async (req, res) => {
     const parsed = draftSchema.safeParse(req.body);

@@ -25,6 +25,7 @@ export interface AlertRow {
   whatsapp_delivered: number;
   email_attempted: number;
   email_delivered: number;
+  focal_points_notified: number;
   signature: string | null;
   signing_key_id: string | null;
   signed_at: string | null;
@@ -34,7 +35,7 @@ export interface AlertRow {
 
 const COLS = sql`id, hazard_event_id, place_id, category, event_type, severity, urgency, certainty,
   headline, description, instruction, area_desc, status, recipients, sms_attempted, sms_delivered,
-  whatsapp_attempted, whatsapp_delivered, email_attempted, email_delivered,
+  whatsapp_attempted, whatsapp_delivered, email_attempted, email_delivered, focal_points_notified,
   signature, signing_key_id, signed_at, published_at, created_at`;
 
 /** Event + hazard-type + place details needed to draft an alert. */
@@ -121,6 +122,7 @@ export async function setPublished(
     whatsappDelivered: number;
     emailAttempted: number;
     emailDelivered: number;
+    focalPointsNotified: number;
   },
 ): Promise<void> {
   await db.execute(sql`
@@ -128,6 +130,7 @@ export async function setPublished(
       recipients = ${counts.recipients}, sms_attempted = ${counts.smsAttempted}, sms_delivered = ${counts.smsDelivered},
       whatsapp_attempted = ${counts.whatsappAttempted}, whatsapp_delivered = ${counts.whatsappDelivered},
       email_attempted = ${counts.emailAttempted}, email_delivered = ${counts.emailDelivered},
+      focal_points_notified = ${counts.focalPointsNotified},
       updated_at = now()
     WHERE id = ${id}
   `);

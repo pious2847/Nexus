@@ -645,7 +645,21 @@ Each phase is shippable and demoable on its own.
       re-verified — correctly flipped to `verified:false`. `warnings` gained
       `signature`/`signing_key_id`/`signed_at` (migration 0014). Signing is skipped
       gracefully (dev-mode, alert still publishes) if `ALERT_SIGNING_*` env vars are unset.
-- [ ] Last-mile community/radio channels (**N6**)
+- [x] **Last-mile community/radio channels (N6)** — live-verified 2026-07-09. Sirens/PA
+      hardware and live radio-broadcast automation have no integratable API (genuinely
+      out of scope for a software platform); built what IS buildable — a registry of
+      human/institutional relay points (`community_focal_points`: focal persons, radio
+      stations, notice-board locations) that `AlertsService.publish()` fans out a
+      **broadcast-ready script** to via the same already-built SMS/email adapters,
+      separate from personal subscriber opt-in (a focal point's whole job is reaching
+      people with no phone/signal, so it's not gated the same way). Also added a public
+      **printable notice-board sheet** (`GET /api/v1/warnings/:id/notice-sheet`,
+      self-contained HTML, no auth) for physical posting. `warnings.focal_points_notified`
+      counter, migration 0017. Live-verified: registered a real focal point (radio
+      station + contact), published a real alert, confirmed real SMS + email delivery of
+      the broadcast script (distinct wording from the subscriber SMS/email formats),
+      fetched the live notice-sheet HTML, and confirmed the officer list view + a 401 on
+      unauthenticated registration.
 - [x] **"I'm Safe" check-in (N1)** — live-verified 2026-07-08. Tier-1 life-saving
       priority (spec 02's own prioritization). SMS is the primary
       channel (no smartphone/app required) — `SAFE, <place>` / `HELP, <place>` /

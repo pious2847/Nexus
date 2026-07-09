@@ -19,7 +19,9 @@ import { requiredPublishPermission, toCapJson } from './alerts.cap';
 import { formatAlertSms } from './alerts.sms';
 import { formatAlertWhatsapp } from './alerts.whatsapp';
 import { formatAlertEmail } from './alerts.email';
+import { formatAlertBroadcastScript, formatNoticeSheetHtml } from './alerts.broadcast';
 import { getSigningKeys, signCapPayload, verifyCapSignature } from './alerts.signing';
+import type { FocalPointService } from './focal/focal-point.service';
 
 export class PublishForbiddenError extends Error {}
 
@@ -36,6 +38,11 @@ export class AlertsService {
     private readonly sendSms: SmsSender = defaultSendSms,
     private readonly sendWhatsapp: WhatsappSender = defaultSendWhatsapp,
     private readonly sendEmail: EmailSender = defaultSendEmail,
+    // Optional (not defaulted, unlike the senders above) — needs a GeographyService to
+    // construct, which this class doesn't otherwise receive. If omitted, publish() simply
+    // skips the N6 last-mile fan-out rather than failing (same graceful-skip pattern as
+    // `audit` and unset signing keys).
+    private readonly focalPoints?: FocalPointService,
   ) {}
 
   getAlert(id: string) {
@@ -174,8 +181,37 @@ export class AlertsService {
       }
     }
 
+    // Fan out to community focal points — the N6 "last-mile human network" (radio
+    // stations, focal persons, notice boards). Not personal subscribers: every active
+    // focal point covering the area gets the broadcast script, since their whole job is
+    // relaying to people who have no phone/signal at all.
+    let focalPointsNotified = 0;
+    if (placePath && this.focalPoints) {
+      const points = await this.focalPoints.findActiveByScope(placePath);
+      const script = formatAlertBroadcastScript({
+        headline: alert.headline,
+        description: alert.description,
+        instruction: alert.instruction,
+        areaDesc: alert.area_desc,
+        severity: alert.severity as CapSeverity,
+      });
+      for (const point of points) {
+        let delivered = false;
+        if (point.contact_phone) {
+          const result = await this.sendSms(point.contact_phone, script);
+          delivered = delivered || result.sent;
+        }
+        if (point.contact_email) {
+          const result = await this.sendEmail(point.contact_email, `NEXUS Broadcast Alert — ${alert.headline}`, `<pre style="white-space:pre-wrap;font-family:inherit">${script}</pre>`, script);
+          delivered = delivered || result.sent;
+        }
+        if (delivered) focalPointsNotified++;
+      }
+    }
+
     await repo.setPublished(this.db, alertId, userId, {
-      recipients, smsAttempted, smsDelivered, whatsappAttempted, whatsappDelivered, emailAttempted, emailDelivered,
+      recipients, smsAttempted, smsDelivered, whatsappAttempted, whatsappDelivered,
+      emailAttempted, emailDelivered, focalPointsNotified,
     });
 
     // Sign the CAP payload (spec 02 N10 — anti-spoofing) now that published_at is set,
@@ -198,11 +234,31 @@ export class AlertsService {
       placeId: alert.place_id,
       metadata: {
         severity: alert.severity, recipients, smsAttempted, smsDelivered,
-        whatsappAttempted, whatsappDelivered, emailAttempted, emailDelivered, signed: !!keys,
+        whatsappAttempted, whatsappDelivered, emailAttempted, emailDelivered,
+        focalPointsNotified, signed: !!keys,
       },
     });
 
     return (await repo.getAlert(this.db, alertId)) as AlertRow;
+  }
+
+  /**
+   * Printable HTML notice sheet for physical posting (spec 02 N6 — a
+   * community notice board). No auth needed once an alert is published —
+   * CAP scope is 'Public' — but returns null for a draft (nothing to post yet).
+   */
+  async noticeSheetHtml(id: string): Promise<string | null> {
+    const alert = await repo.getAlert(this.db, id);
+    if (!alert || alert.status !== 'published') return null;
+    return formatNoticeSheetHtml({
+      alertId: alert.id,
+      publishedAt: alert.published_at,
+      headline: alert.headline,
+      description: alert.description,
+      instruction: alert.instruction,
+      areaDesc: alert.area_desc,
+      severity: alert.severity as CapSeverity,
+    });
   }
 
   /** The public signing key + algorithm, so anyone can verify a signature independently (no auth). */

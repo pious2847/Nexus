@@ -36,6 +36,9 @@ export const PERMISSIONS = {
   'sos.create': 'Send an SOS / panic-button alert',
   'sos.read': 'View open SOS alerts for an area',
   'sos.manage': 'Acknowledge / resolve an SOS alert',
+  'focal.create': 'Register a community focal point (last-mile relay: focal person, radio station, notice board)',
+  'focal.read': 'View registered community focal points for an area',
+  'focal.manage': 'Update / deactivate a community focal point',
   'user.manage': 'Manage user accounts',
   'role.assign': 'Assign roles to users',
   'org.manage': 'Manage organizations',
@@ -58,6 +61,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'health.facility.read', 'health.facility.manage', 'health.case.read',
     'safety.checkin.create', 'safety.checkin.read',
     'sos.create', 'sos.read', 'sos.manage',
+    'focal.create', 'focal.read', 'focal.manage',
   ],
   regional_coordinator: [
     'hazard.event.read', 'hazard.event.create', 'hazard.event.transition',
@@ -68,6 +72,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'health.facility.read', 'health.facility.manage', 'health.case.read',
     'safety.checkin.create', 'safety.checkin.read',
     'sos.create', 'sos.read', 'sos.manage',
+    'focal.create', 'focal.read', 'focal.manage',
   ],
   district_officer: [
     'hazard.event.read', 'hazard.event.create',
@@ -78,6 +83,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'health.case.create', 'health.case.read',
     'safety.checkin.create', 'safety.checkin.read',
     'sos.create', 'sos.read', 'sos.manage',
+    'focal.create', 'focal.read', 'focal.manage',
   ],
   // Field workers register + view (geo-scoped to their assigned place, like reports) —
   // but status/consent changes (e.g. marking someone deceased) stay with officers+.
@@ -87,11 +93,16 @@ export const ROLE_PERMISSIONS: Record<Role, readonly (Permission | '*')[]> = {
     'report.create', 'report.read', 'sanitation.manage', 'vulnerable.create', 'vulnerable.read',
     'health.facility.read', 'health.case.create', 'health.case.read',
     'safety.checkin.create', 'safety.checkin.read',
-    'sos.create', 'sos.read',
+    'sos.create', 'sos.read', 'focal.read',
   ],
   // Community moderators are the "focal person" N6/N1 relies on — they can check people
-  // in on their behalf, and see the local aggregate to know who's still unaccounted for.
-  community_moderator: ['report.read', 'report.verify', 'safety.checkin.create', 'safety.checkin.read', 'sos.create', 'sos.read'],
+  // in on their behalf, see the local aggregate to know who's still unaccounted for, and
+  // register other focal points (radio stations, notice boards) in their area — but
+  // deactivating/editing an existing one stays with officers+.
+  community_moderator: [
+    'report.read', 'report.verify', 'safety.checkin.create', 'safety.checkin.read', 'sos.create', 'sos.read',
+    'focal.create', 'focal.read',
+  ],
   ngo_partner: ['data.dataset.read', 'data.request.create', 'report.read', 'response.manage'],
   researcher: ['data.dataset.read', 'data.request.create'],
   data_consumer: ['data.dataset.read'],
