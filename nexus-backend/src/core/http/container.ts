@@ -28,6 +28,10 @@ import { AssetService } from '../../modules/response/volunteers/asset.service';
 import { ResponseTimelineService } from '../../modules/response/timeline.service';
 import { SystemHealthService } from '../../modules/admin/system-health.service';
 import { AnalyticsService } from '../../modules/analytics/analytics.service';
+import { MissingPersonsService } from '../../modules/missing/missing.service';
+import { RumorService } from '../../modules/rumors/rumor.service';
+import { MythFactService } from '../../modules/rumors/mythfact.service';
+import { AnticipatoryService } from '../../modules/anticipatory/anticipatory.service';
 
 export interface CoreServices {
   db: Db;
@@ -54,17 +58,25 @@ export interface CoreServices {
   responseTimeline: ResponseTimelineService;
   systemHealth: SystemHealthService;
   analytics: AnalyticsService;
+  missingPersons: MissingPersonsService;
+  rumors: RumorService;
+  mythFacts: MythFactService;
+  anticipatory: AnticipatoryService;
 }
 
 export function createCoreServices(pool: Pool): CoreServices {
   const db = drizzle(pool);
   const audit = new AuditService(db);
   const geography = new GeographyService(db);
-  const hazards = new HazardService(db, audit);
   const rbac = new RbacService(db);
   const notifications = new NotificationsService(db);
   const focalPoints = new FocalPointService(db, geography, audit);
   const dispatch = new DispatchService(db, audit);
+  const vulnerablePersons = new VulnerablePersonsService(db, geography, audit);
+  // anticipatory must exist before hazards (hazards.transition() calls into it), which
+  // in turn means its own deps (focalPoints, vulnerablePersons) must be constructed first.
+  const anticipatory = new AnticipatoryService(db, geography, audit, focalPoints, vulnerablePersons);
+  const hazards = new HazardService(db, audit, anticipatory);
   return {
     db,
     audit,
@@ -74,11 +86,12 @@ export function createCoreServices(pool: Pool): CoreServices {
     notifications,
     focalPoints,
     dispatch,
+    vulnerablePersons,
+    anticipatory,
     auth: new AuthService(db, process.env.JWT_SECRET ?? '', undefined, audit),
     reports: new ReportsService(db, geography, hazards, audit),
     alerts: new AlertsService(db, rbac, notifications, audit, undefined, undefined, undefined, focalPoints),
     hazardMap: new HazardMapService(db),
-    vulnerablePersons: new VulnerablePersonsService(db, geography, audit),
     healthFacilities: new HealthFacilityService(db, geography, audit),
     diseaseCases: new DiseaseCaseService(db, geography, audit),
     safetyCheckins: new SafetyCheckinService(db, geography, audit),
@@ -90,5 +103,8 @@ export function createCoreServices(pool: Pool): CoreServices {
     responseTimeline: new ResponseTimelineService(db),
     systemHealth: new SystemHealthService(db),
     analytics: new AnalyticsService(db),
+    missingPersons: new MissingPersonsService(db, geography, audit),
+    rumors: new RumorService(db, geography, audit),
+    mythFacts: new MythFactService(db, geography, focalPoints, undefined, undefined),
   };
 }

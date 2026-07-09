@@ -27,6 +27,10 @@ import { buildAssetRouter } from '../../modules/response/volunteers/asset.routes
 import { buildResponseTimelineRouter } from '../../modules/response/timeline.routes';
 import { buildAdminRouter } from '../../modules/admin/admin.routes';
 import { buildAnalyticsRouter } from '../../modules/analytics/analytics.routes';
+import { buildMissingPersonsRouter } from '../../modules/missing/missing.routes';
+import { buildRumorRouter } from '../../modules/rumors/rumor.routes';
+import { buildMythFactRouter } from '../../modules/rumors/mythfact.routes';
+import { buildAnticipatoryRouter } from '../../modules/anticipatory/anticipatory.routes';
 import { startHazardJobs } from '../../modules/hazards/hazards.jobs';
 
 export function registerCoreRoutes(app: Express): void {
@@ -59,8 +63,12 @@ export function registerCoreRoutes(app: Express): void {
   app.use('/api/v1/response-timeline', buildResponseTimelineRouter(services));
   app.use('/api/v1/admin', buildAdminRouter(services));
   app.use('/api/v1/analytics', buildAnalyticsRouter(services));
+  app.use('/api/v1/missing-persons', buildMissingPersonsRouter(services));
+  app.use('/api/v1/rumors', buildRumorRouter(services));
+  app.use('/api/v1/myth-facts', buildMythFactRouter(services));
+  app.use('/api/v1/anticipatory', buildAnticipatoryRouter(services));
 
-  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake, health-facilities, health-cases, safety-checkins, sos, community-focal-points, shelters, relief, dispatch, volunteers, response-assets, response-timeline, admin, analytics (TypeScript)');
+  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake, health-facilities, health-cases, safety-checkins, sos, community-focal-points, shelters, relief, dispatch, volunteers, response-assets, response-timeline, admin, analytics, missing-persons, rumors, myth-facts, anticipatory (TypeScript)');
 
   // Scheduled hazard evaluators (opt-in via ENABLE_HAZARD_JOBS).
   startHazardJobs({ db: services.db, hazards: services.hazards, geography: services.geography });

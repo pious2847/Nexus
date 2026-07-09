@@ -11,6 +11,7 @@ import * as repo from './hazards.repository';
 import type { CreateEventInput, HazardEvent } from './hazards.repository';
 import { assertTransition, isTerminal } from './hazards.state';
 import { computeImpact } from './impact';
+import type { AnticipatoryService } from '../anticipatory/anticipatory.service';
 
 export interface RaiseEventInput {
   hazardType: string;
@@ -30,6 +31,7 @@ export class HazardService {
   constructor(
     private readonly db: Db,
     private readonly audit?: AuditRecorder,
+    private readonly anticipatory?: AnticipatoryService,
   ) {}
 
   listHazardTypes() {
@@ -152,7 +154,24 @@ export class HazardService {
       metadata: { from, to: toState, reason },
     });
 
-    return (await repo.getEvent(this.db, id)) as HazardEvent;
+    const updated = (await repo.getEvent(this.db, id)) as HazardEvent;
+
+    // Anticipatory action (N12): fire-once forecast-based protocols keyed on
+    // (hazard_type, place, trigger_state). Never blocks the transition itself.
+    if (updated.place_id) {
+      try {
+        await this.anticipatory?.checkAndActivate({
+          id: updated.id,
+          hazardType: updated.hazard_type,
+          placeId: updated.place_id,
+          state: toState,
+        });
+      } catch (err) {
+        console.error('[anticipatory] checkAndActivate failed for event', id, (err as Error).message);
+      }
+    }
+
+    return updated;
   }
 
   addPrediction(input: Parameters<typeof repo.insertPrediction>[1]) {
