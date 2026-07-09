@@ -1,8 +1,9 @@
 /**
- * SOS / panic-button service (spec 02 N2). Module M (formal dispatch
- * tasking) doesn't exist yet — this achieves the "minutes matter" goal via
- * immediate SMS + in-app notification of every responder whose role/geo
- * scope covers the affected place, rather than a dispatch board.
+ * SOS / panic-button service (spec 02 N2). Immediately SMS + in-app notifies
+ * every responder whose role/geo scope covers the affected place (the
+ * "minutes matter" goal), AND — now that Module M exists — auto-creates a
+ * critical-priority dispatch task (`source_type: 'sos'`), the formal
+ * dispatch-board link the spec originally described.
  */
 import type { Db } from '../../shared/db';
 import type { AuditRecorder } from '../../core/audit/audit.service';
@@ -13,6 +14,7 @@ import { roleHasPermission } from '../../core/rbac/rbac';
 import type { Role } from '@nexus/shared';
 import * as repo from './sos.repository';
 import type { SosAlertRow } from './sos.repository';
+import type { DispatchService } from '../response/dispatch/dispatch.service';
 
 type SmsSender = (to: string, message: string) => Promise<SmsResult>;
 
@@ -32,6 +34,10 @@ export class SosService {
     private readonly notifications: NotificationsService,
     private readonly audit?: AuditRecorder,
     private readonly sendSms: SmsSender = defaultSendSms,
+    // Optional (not defaulted) — needs a DispatchService this class doesn't otherwise
+    // receive. If omitted, raise() just skips auto-creating a dispatch task (same
+    // graceful-degrade pattern as AlertsService's optional `focalPoints`).
+    private readonly dispatch?: DispatchService,
   ) {}
 
   async raise(input: RaiseSosInput, reportedBy?: string | null): Promise<SosAlertRow> {
@@ -50,13 +56,31 @@ export class SosService {
     const notified = await this.notifyResponders(alert, place?.path ?? null, place?.name ?? null);
     await repo.setNotifiedCount(this.db, alert.id, notified);
 
+    // Auto-create a dispatch task so the SOS shows up on the response board, not just
+    // as notifications — closing the spec's "auto-creates dispatch task" link (N2).
+    if (this.dispatch) {
+      await this.dispatch.createTask(
+        {
+          placeId: alert.place_id,
+          lng: alert.lng,
+          lat: alert.lat,
+          taskType: 'rescue',
+          description: alert.notes ?? `SOS${alert.danger_type ? ` — ${alert.danger_type}` : ''}`,
+          priority: 'critical',
+          sourceType: 'sos',
+          sourceId: alert.id,
+        },
+        reportedBy ?? null,
+      );
+    }
+
     await this.audit?.record({
       actorId: reportedBy ?? null,
       action: 'sos.raised',
       resourceType: 'sos_alert',
       resourceId: alert.id,
       placeId: alert.place_id,
-      metadata: { dangerType: alert.danger_type, locationPrecision: alert.location_precision, respondersNotified: notified },
+      metadata: { dangerType: alert.danger_type, locationPrecision: alert.location_precision, respondersNotified: notified, dispatchLinked: !!this.dispatch },
     });
 
     return (await repo.getSos(this.db, alert.id)) as SosAlertRow;

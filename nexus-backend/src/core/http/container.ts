@@ -20,6 +20,12 @@ import { DiseaseCaseService } from '../../modules/health/cases/disease-case.serv
 import { SafetyCheckinService } from '../../modules/safety/checkin.service';
 import { SosService } from '../../modules/safety/sos.service';
 import { FocalPointService } from '../../modules/alerts/focal/focal-point.service';
+import { ShelterService } from '../../modules/response/shelters/shelter.service';
+import { ReliefService } from '../../modules/response/relief/relief.service';
+import { DispatchService } from '../../modules/response/dispatch/dispatch.service';
+import { VolunteerService } from '../../modules/response/volunteers/volunteer.service';
+import { AssetService } from '../../modules/response/volunteers/asset.service';
+import { ResponseTimelineService } from '../../modules/response/timeline.service';
 
 export interface CoreServices {
   db: Db;
@@ -38,6 +44,12 @@ export interface CoreServices {
   safetyCheckins: SafetyCheckinService;
   sos: SosService;
   focalPoints: FocalPointService;
+  shelters: ShelterService;
+  relief: ReliefService;
+  dispatch: DispatchService;
+  volunteers: VolunteerService;
+  assets: AssetService;
+  responseTimeline: ResponseTimelineService;
 }
 
 export function createCoreServices(pool: Pool): CoreServices {
@@ -48,6 +60,7 @@ export function createCoreServices(pool: Pool): CoreServices {
   const rbac = new RbacService(db);
   const notifications = new NotificationsService(db);
   const focalPoints = new FocalPointService(db, geography, audit);
+  const dispatch = new DispatchService(db, audit);
   return {
     db,
     audit,
@@ -56,6 +69,7 @@ export function createCoreServices(pool: Pool): CoreServices {
     rbac,
     notifications,
     focalPoints,
+    dispatch,
     auth: new AuthService(db, process.env.JWT_SECRET ?? '', undefined, audit),
     reports: new ReportsService(db, geography, hazards, audit),
     alerts: new AlertsService(db, rbac, notifications, audit, undefined, undefined, undefined, focalPoints),
@@ -64,6 +78,11 @@ export function createCoreServices(pool: Pool): CoreServices {
     healthFacilities: new HealthFacilityService(db, geography, audit),
     diseaseCases: new DiseaseCaseService(db, geography, audit),
     safetyCheckins: new SafetyCheckinService(db, geography, audit),
-    sos: new SosService(db, geography, notifications, audit),
+    sos: new SosService(db, geography, notifications, audit, undefined, dispatch),
+    shelters: new ShelterService(db, geography, audit),
+    relief: new ReliefService(db, audit),
+    volunteers: new VolunteerService(db, geography, audit),
+    assets: new AssetService(db, audit),
+    responseTimeline: new ResponseTimelineService(db),
   };
 }

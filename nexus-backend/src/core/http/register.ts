@@ -19,6 +19,12 @@ import { buildDiseaseCaseRouter } from '../../modules/health/cases/disease-case.
 import { buildSafetyCheckinRouter } from '../../modules/safety/checkin.routes';
 import { buildSosRouter } from '../../modules/safety/sos.routes';
 import { buildFocalPointRouter } from '../../modules/alerts/focal/focal-point.routes';
+import { buildShelterRouter } from '../../modules/response/shelters/shelter.routes';
+import { buildReliefRouter } from '../../modules/response/relief/relief.routes';
+import { buildDispatchRouter } from '../../modules/response/dispatch/dispatch.routes';
+import { buildVolunteerRouter } from '../../modules/response/volunteers/volunteer.routes';
+import { buildAssetRouter } from '../../modules/response/volunteers/asset.routes';
+import { buildResponseTimelineRouter } from '../../modules/response/timeline.routes';
 import { startHazardJobs } from '../../modules/hazards/hazards.jobs';
 
 export function registerCoreRoutes(app: Express): void {
@@ -43,8 +49,14 @@ export function registerCoreRoutes(app: Express): void {
   app.use('/api/v1/safety-checkins', buildSafetyCheckinRouter(services));
   app.use('/api/v1/sos', buildSosRouter(services));
   app.use('/api/v1/community-focal-points', buildFocalPointRouter(services));
+  app.use('/api/v1/shelters', buildShelterRouter(services));
+  app.use('/api/v1/relief', buildReliefRouter(services));
+  app.use('/api/v1/dispatch', buildDispatchRouter(services));
+  app.use('/api/v1/volunteers', buildVolunteerRouter(services));
+  app.use('/api/v1/response-assets', buildAssetRouter(services));
+  app.use('/api/v1/response-timeline', buildResponseTimelineRouter(services));
 
-  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake, health-facilities, health-cases, safety-checkins, sos, community-focal-points (TypeScript)');
+  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake, health-facilities, health-cases, safety-checkins, sos, community-focal-points, shelters, relief, dispatch, volunteers, response-assets, response-timeline (TypeScript)');
 
   // Scheduled hazard evaluators (opt-in via ENABLE_HAZARD_JOBS).
   startHazardJobs({ db: services.db, hazards: services.hazards, geography: services.geography });

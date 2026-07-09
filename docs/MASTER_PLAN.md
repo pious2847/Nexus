@@ -264,16 +264,47 @@ The HDX-style data-sharing platform — our path to national relevance & sustain
 - 🆕 **Integration settings** — SMS/WhatsApp/weather/AI keys & webhooks managed in one place.
 - 🆕 **System health & job monitoring** — cron/queue status, ingestion health.
 
-### Module M — Emergency Response & Coordination 🆕 (new pillar)
+### Module M — Emergency Response & Coordination ✅ (2026-07-09) — backend live-verified
 Moves the platform from *warning* people to *coordinating the response* — the "preparedness
 & response" pillar of the WMO model. Activated when a hazard event reaches `active`/`response`.
+Built as two parallel workstreams (multi-agent, same pattern as Module D) against a shared
+migration/RBAC foundation (`0018_emergency_response.sql`, 7 tables) committed first, then
+merged. One real bug found + fixed during live verification: `shelters.facilities` (a
+`text[]` column) hit the known Drizzle gotcha where a bare JS array interpolates as a
+tuple, not an array literal — fixed with the same `ARRAY[...]::text[]` helper already used
+elsewhere (`notifications.repository.ts`, `volunteer.repository.ts`).
 
-- 🆕 **Shelters & safe zones** — registry of evacuation shelters/safe zones (geo-tagged), with capacity, current occupancy, facilities (water, medical), and open/closed status. Surfaced to citizens ("nearest open shelter") during an event.
-- 🆕 **Relief inventory** — track relief supplies (food, water, tents, medical kits) by stock location; record distributions; flag shortages. Gives agencies/NGOs real logistics visibility.
-- 🆕 **Incident dispatch & tasking** — during an active event, create tasks (rescue, assessment, distribution, repair), assign to teams/field workers, track status (`open → assigned → in-progress → done`), all on the live map.
-- 🆕 **Volunteer & resource coordination** — register volunteers (skills, availability, location) and assets (vehicles, boats, equipment); match them to active incidents by proximity & skill.
-- 🆕 **Response timeline & after-action** — every action logged; auto-generates an after-action record per event (what happened, response time, resources used) — feeds analytics + becomes historical data.
-- 🔁 **Ties to hazards & alerts** — dispatch/shelters activate off a hazard event (Module B) and are announced via broadcasts (Module F).
+- ✅ **Shelters & safe zones** — geo-tagged registry, capacity/occupancy tracking that
+  **auto-transitions status** (`open ↔ full`, never auto-reopens a `closed` shelter), a
+  public unauthenticated `GET /shelters/nearest?lng=&lat=` (PostGIS KNN) for citizens
+  during an event — held to the same openness as the hazard map.
+- ✅ **Relief inventory** — stock levels + distributions (`relief_stocks`/`relief_distributions`).
+  `distribute()` guards against over-distribution (`Insufficient stock: requested X,
+  available Y`, 400 not 500) before decrementing stock.
+- ✅ **Incident dispatch & tasking** — `dispatch_tasks` + `dispatch_task_events`, a state
+  machine (`open → assigned → in_progress → done`, `cancelled` from any non-terminal state)
+  structurally identical to the hazard-event lifecycle (`dispatch.state.ts` mirrors
+  `hazards.state.ts`). **SOS (N2) now auto-creates a critical-priority dispatch task**
+  (`source_type: 'sos'`) — the formal dispatch-board link the spec originally described,
+  wired in after Module M existed to receive it.
+- ✅ **Volunteer & resource coordination** — `volunteers`/`response_assets`, skill-based
+  matching (`matchForTask`: ltree geo-match + `skills @> ARRAY[...]`) for the "match by
+  proximity & skill" feature.
+- ✅ **Response timeline & after-action** — `GET /api/v1/response-timeline/:hazardEventId`
+  merges `dispatch_task_events` + `relief_distributions` chronologically — a read-side
+  aggregation of logs that already exist, not a new duplicated log table.
+- ✅ **Ties to hazards & alerts** — dispatch tasks link to `hazard_event_id`; the SOS link
+  above closes the Module B/F tie described in the original spec.
+
+**Live-verified end-to-end** (real HTTP + real DB, Neon dev branch): shelter register →
+nearest-shelter lookup → occupancy adjustment with auto full/open transition; relief stock
+→ over-distribution rejected (400) → real distribution linked to a hazard event; a real
+dispatch task walked through its full lifecycle (`open→assigned→in_progress→done`, illegal
+`done→assigned` correctly rejected); a volunteer registered, matched by skill, assigned to
+the task; the response-timeline endpoint correctly merged 4 dispatch events + 1 relief
+distribution in chronological order; a **real SMS SOS** (`SOS, Tolon, ...`) correctly
+auto-created a linked `critical`-priority `rescue` dispatch task. Not built: a live map
+view (frontend), analytics feed-in (Module K doesn't exist yet either).
 
 ### Cross-cutting capabilities (apply to all modules)
 - 🆕 **Internationalization (i18n)** — English + major Ghanaian languages (Twi, Ewe, Dagbani, Ga, Hausa) for citizen-facing surfaces + AI output.
@@ -679,12 +710,14 @@ Each phase is shippable and demoable on its own.
       check-in captured the subject's name correctly, aggregated summary matched
       (`safe:1, need_help:1`), unauthenticated access to the officer view correctly 401'd.
       `safety_checkins` table, migration 0015.
-- [x] **SOS / panic button (N2)** — live-verified 2026-07-08. Module M (formal dispatch
-      tasking) doesn't exist yet, so this v1 achieves the "minutes matter" goal via
-      **immediate SMS + in-app notification of every responder** whose role/geo-scope
-      covers the affected place (`sos.repository.ts`'s `findResponderCandidates()`: national
-      grants or an ancestor geo-scope, filtered to `sos.manage`-holding roles via the pure
-      `roleHasPermission()`), rather than a dispatch board. `sos_alerts.geometry` is
+- [x] **SOS / panic button (N2)** — live-verified 2026-07-08, dispatch-linked 2026-07-09.
+      Originally shipped ahead of Module M (which didn't exist yet), so v1 achieved the
+      "minutes matter" goal via **immediate SMS + in-app notification of every responder**
+      whose role/geo-scope covers the affected place (`sos.repository.ts`'s
+      `findResponderCandidates()`: national grants or an ancestor geo-scope, filtered to
+      `sos.manage`-holding roles via the pure `roleHasPermission()`). **Now that Module M
+      exists, `raise()` also auto-creates a critical-priority dispatch task** — the formal
+      dispatch-board link the spec always described, closing that gap. `sos_alerts.geometry` is
       `Point` **NOT NULL** — the whole point of N2 is precise location, so unlike N1 an
       unresolvable place is rejected outright (asked to retry) rather than recorded
       without one. SMS is the fallback channel (`SOS, <place>, <what is happening>`,
