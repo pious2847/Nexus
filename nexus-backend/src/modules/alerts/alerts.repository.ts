@@ -102,6 +102,20 @@ export async function getAlert(db: Db, id: string): Promise<AlertRow | null> {
   return (r.rows[0] as unknown as AlertRow) ?? null;
 }
 
+/**
+ * `warnings.event_type` is a human-readable label (e.g. "Flood Warning", set
+ * from `hazard_types.label` at draft time — see `draftFromEvent`), NOT the
+ * machine hazard_type code. Callers that need the code (e.g. to look up a
+ * pure per-hazard-type constant like an icon) must join back through
+ * `hazard_event_id` instead of trusting `event_type`.
+ */
+export async function getAlertHazardTypeCode(db: Db, id: string): Promise<string | null> {
+  const r = await db.execute(sql`
+    SELECT e.hazard_type FROM warnings w JOIN hazard_events e ON e.id = w.hazard_event_id WHERE w.id = ${id}
+  `);
+  return (r.rows[0] as { hazard_type: string } | undefined)?.hazard_type ?? null;
+}
+
 export async function listAlerts(db: Db, f: { status?: string; limit?: number }): Promise<AlertRow[]> {
   const conds = [sql`TRUE`];
   if (f.status) conds.push(sql`status = ${f.status}`);

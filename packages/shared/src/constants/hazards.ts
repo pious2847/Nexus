@@ -45,6 +45,24 @@ export const SEVERITY_COLORS: Record<CapSeverity, string> = {
   extreme: '#C62828', // red
 };
 
+/**
+ * Pictogram/emoji per hazard type (spec 02 N5 — accessibility & no-literacy
+ * alerting: a warning nobody can read or hear isn't a warning). Frontend-
+ * agnostic — a plain string a PWA/print sheet/SMS can drop in directly,
+ * not an icon-font/SVG reference that would tie this package to a specific
+ * frontend rendering stack.
+ */
+export const HAZARD_ICONS: Record<HazardType, string> = {
+  flood: '🌊',
+  heavy_rainfall: '🌧️',
+  drought: '☀️',
+  bushfire: '🔥',
+  disease_outbreak: '🦠',
+  windstorm: '🌪️',
+  extreme_heat: '🌡️',
+  sanitation_failure: '🚱',
+};
+
 /** Delivery channels for alerts/notifications (Module F). */
 export const NOTIFICATION_CHANNELS = [
   'in_app',

@@ -18,6 +18,8 @@ import type { AlertRow } from './alerts.repository';
 import { requiredPublishPermission, toCapJson } from './alerts.cap';
 import { formatAlertSms } from './alerts.sms';
 import { formatAlertWhatsapp } from './alerts.whatsapp';
+import { buildAccessibleAlert, type AccessibleAlert } from './alerts.accessibility';
+import { HAZARD_TYPES, type HazardType } from '@nexus/shared';
 import { formatAlertEmail } from './alerts.email';
 import { formatAlertBroadcastScript, formatNoticeSheetHtml } from './alerts.broadcast';
 import { getSigningKeys, signCapPayload, verifyCapSignature } from './alerts.signing';
@@ -50,6 +52,23 @@ export class AlertsService {
   }
   listAlerts(filter: { status?: string; limit?: number }) {
     return repo.listAlerts(this.db, filter);
+  }
+
+  /** Icon/colour/TTS-script view of a warning (spec 02 N5 — accessibility). Null if not found or its hazard type is unrecognized. */
+  async accessibleAlert(id: string): Promise<AccessibleAlert | null> {
+    const alert = await repo.getAlert(this.db, id);
+    if (!alert) return null;
+    // event_type is a human label ("Flood Warning"), not the machine code — fetch the
+    // real code via the linked hazard event (see getAlertHazardTypeCode's doc comment).
+    const hazardTypeCode = await repo.getAlertHazardTypeCode(this.db, id);
+    if (!hazardTypeCode || !(HAZARD_TYPES as readonly string[]).includes(hazardTypeCode)) return null;
+    return buildAccessibleAlert({
+      hazardType: hazardTypeCode as HazardType,
+      severity: (alert.severity as CapSeverity) ?? null,
+      headline: alert.headline,
+      instruction: alert.instruction,
+      areaDesc: alert.area_desc,
+    });
   }
   toCap(alert: AlertRow) {
     return toCapJson({

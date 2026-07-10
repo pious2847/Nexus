@@ -72,6 +72,18 @@ export function buildAlertsRouter({ alerts, rbac }: CoreServices): Router {
     res.type('html').send(html);
   });
 
+  // Accessible view (spec 02 N5) — icon, colour, TTS-ready audio script. No auth,
+  // same openness as notice-sheet: a screen-reader/voice-assistant/print-sheet
+  // consumer for this needs to work without an account.
+  router.get('/:id/accessible', async (req, res) => {
+    const accessible = await alerts.accessibleAlert(String(req.params.id));
+    if (!accessible) {
+      res.status(404).json({ success: false, message: 'Not found' });
+      return;
+    }
+    res.json({ success: true, data: accessible });
+  });
+
   // Draft from a hazard event — requires at least advisory publish rights (geo-scoped later).
   router.post('/from-event', authenticate, requirePermission(rbac, 'alert.publish.advisory'), async (req, res) => {
     const parsed = draftSchema.safeParse(req.body);
