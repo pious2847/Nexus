@@ -37,6 +37,7 @@ import { buildAdminUsersRouter } from '../../modules/admin/users/admin-users.rou
 import { buildOrganizationsRouter } from '../../modules/admin/organizations/organizations.routes';
 import { buildCommandRouter } from '../../modules/command/command.routes';
 import { buildEvacuationRouter } from '../../modules/evacuation/evacuation.routes';
+import { buildDataHubRouter } from '../../modules/datahub/datahub.routes';
 import { startHazardJobs } from '../../modules/hazards/hazards.jobs';
 
 export function registerCoreRoutes(app: Express): void {
@@ -83,8 +84,9 @@ export function registerCoreRoutes(app: Express): void {
   app.use('/api/v1/admin/organizations', buildOrganizationsRouter(services));
   app.use('/api/v1/hazards/events/:id/cop', buildCommandRouter(services));
   app.use('/api/v1/evacuation', buildEvacuationRouter(services));
+  app.use('/api/v1/datahub', buildDataHubRouter(services));
 
-  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake, health-facilities, health-cases, safety-checkins, sos, community-focal-points, shelters, relief, dispatch, volunteers, response-assets, response-timeline, admin, analytics, missing-persons, rumors, myth-facts, anticipatory, badges, assessments, admin-users, admin-organizations, command, evacuation (TypeScript)');
+  console.log('[core] mounted auth-v2, geography, hazards, incident-reports, warnings, notifications, hazard-map, vulnerable-persons, sms-intake, health-facilities, health-cases, safety-checkins, sos, community-focal-points, shelters, relief, dispatch, volunteers, response-assets, response-timeline, admin, analytics, missing-persons, rumors, myth-facts, anticipatory, badges, assessments, admin-users, admin-organizations, command, evacuation, datahub (TypeScript)');
 
   // Scheduled hazard evaluators (opt-in via ENABLE_HAZARD_JOBS).
   startHazardJobs({ db: services.db, hazards: services.hazards, geography: services.geography });

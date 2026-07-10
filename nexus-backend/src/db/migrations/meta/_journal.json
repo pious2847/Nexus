@@ -169,6 +169,13 @@
       "when": 1753401600000,
       "tag": "0023_drill_mode",
       "breakpoints": false
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1753488000000,
+      "tag": "0024_data_hub",
+      "breakpoints": false
     }
   ]
 }

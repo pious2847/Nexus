@@ -36,6 +36,7 @@ import { BadgeService } from '../../modules/reports/badges.service';
 import { OrganizationsService } from '../../modules/admin/organizations/organizations.service';
 import { CommandService } from '../../modules/command/command.service';
 import { EvacuationService } from '../../modules/evacuation/evacuation.service';
+import { DataHubService } from '../../modules/datahub/datahub.service';
 import { AssessmentService } from '../../modules/assessments/assessment.service';
 import { AdminUsersService } from '../../modules/admin/users/admin-users.service';
 
@@ -74,6 +75,7 @@ export interface CoreServices {
   organizations: OrganizationsService;
   command: CommandService;
   evacuation: EvacuationService;
+  dataHub: DataHubService;
 }
 
 export function createCoreServices(pool: Pool): CoreServices {
@@ -125,5 +127,6 @@ export function createCoreServices(pool: Pool): CoreServices {
     organizations: new OrganizationsService(db, audit),
     command: new CommandService(db, audit),
     evacuation: new EvacuationService(db),
+    dataHub: new DataHubService(db, audit),
   };
 }
