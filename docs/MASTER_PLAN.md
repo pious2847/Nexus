@@ -951,6 +951,25 @@ Each phase is shippable and demoable on its own.
       (`getAlertHazardTypeCode()`); caught via live verification against a real
       published warning (404 first, diagnosed, fixed, re-verified 200 with the correct
       icon/colour/script), not by code inspection alone.
+- [x] **Drills, simulation & test mode (N13)** — live-verified 2026-07-10.
+      `hazard_events.is_drill` (default `false`, zero change to any existing row/query).
+      A drill exercises the real pipeline end-to-end (reports, dispatch, check-ins, COP)
+      but: (1) `draftFromEvent()` prefixes the alert headline itself with a "🧪 TEST
+      DRILL" marker, so every channel — SMS/email/WhatsApp/CAP JSON, and the N10
+      Ed25519 signature computed over it — inherits the marker with no per-channel
+      special-casing; (2) the public hazard map + Module K analytics exclude drills by
+      default (a citizen-facing view must never show test data as real); (3) N12
+      anticipatory action's real SMS/email fan-out to focal points is skipped entirely
+      for drills — the one path where "exercise everything" would otherwise mean
+      texting real people. N14's COP and the regular officer event list are
+      deliberately NOT filtered — internal coordination tools should see drills like
+      real events, since validating them against realistic data is the point.
+      Live-verified: a drill alongside a real control event — drill absent from the
+      public map/analytics (control present in both), COP still showed the drill,
+      the warning headline carried the TEST DRILL prefix, and a real anticipatory
+      protocol matching the drill's trigger correctly did NOT fire (zero SMS to a
+      registered test focal point). Full test suite re-run clean after touching the
+      alert-signing/hazard-map/analytics pipelines.
 - [ ] PWA offline-first hardening (**degraded-mode, N8**)
 - [ ] i18n (first local languages)
 
