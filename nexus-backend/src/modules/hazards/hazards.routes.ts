@@ -22,6 +22,7 @@ const createSchema = z.object({
   urgency: z.string().optional(),
   certainty: z.string().optional(),
   confidence: z.number().optional(),
+  isDrill: z.boolean().optional(),
 });
 const transitionSchema = z.object({ toState: z.enum(HAZARD_EVENT_STATES), reason: z.string().optional() });
 const hazardTypePatchSchema = z.object({

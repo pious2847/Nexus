@@ -18,7 +18,7 @@ export interface SeverityCount {
 export async function activeHazardsBySeverity(db: Db, scopePlaceId: string): Promise<SeverityCount[]> {
   const r = await db.execute(sql`
     SELECT severity, count(*)::int AS count FROM hazard_events e
-    WHERE e.state <> 'closed' AND ${inScope('e', scopePlaceId)}
+    WHERE e.state <> 'closed' AND NOT e.is_drill AND ${inScope('e', scopePlaceId)}
     GROUP BY severity
   `);
   return r.rows as unknown as SeverityCount[];
@@ -131,7 +131,7 @@ export async function monthlyHazardTrend(db: Db, sinceDate: Date, scopePlaceId?:
   const r = await db.execute(sql`
     SELECT to_char(date_trunc('month', e.created_at), 'YYYY-MM') AS month, e.hazard_type, count(*)::int AS count
     FROM hazard_events e
-    WHERE e.created_at >= ${sinceDate}${scopeCond}
+    WHERE e.created_at >= ${sinceDate} AND NOT e.is_drill${scopeCond}
     GROUP BY month, e.hazard_type
     ORDER BY month, e.hazard_type
   `);

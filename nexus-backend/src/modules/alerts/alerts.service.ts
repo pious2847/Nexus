@@ -27,6 +27,10 @@ import type { FocalPointService } from './focal/focal-point.service';
 
 export class PublishForbiddenError extends Error {}
 
+/** N13 — every channel formats from `warnings.headline`, so prefixing it here is
+ *  enough to mark every fan-out surface as a drill without touching each formatter. */
+const DRILL_PREFIX = '🧪 TEST DRILL — NOT A REAL EMERGENCY — ';
+
 type SmsSender = (to: string, message: string) => Promise<SmsResult>;
 type WhatsappSender = (to: string, message: string) => Promise<WhatsappResult>;
 type EmailSender = (to: string, subject: string, html: string, text?: string) => Promise<EmailResult>;
@@ -95,7 +99,13 @@ export class AlertsService {
     const e = await repo.getEventForAlert(this.db, eventId);
     if (!e) throw new Error('Hazard event not found');
     const severity = (e.severity ?? 'minor') as string;
-    const headline = opts?.headline ?? `${e.label} ${severity} — ${e.place_name ?? 'Ghana'}`;
+    const rawHeadline = opts?.headline ?? `${e.label} ${severity} — ${e.place_name ?? 'Ghana'}`;
+    // N13 drill mode: prefix the headline itself (not each channel formatter) so every
+    // downstream surface — SMS, email, WhatsApp, the CAP JSON payload, and therefore
+    // the Ed25519 signature computed over it (N10) — inherits the marker automatically.
+    // A real fan-out would still reach real subscribers, so the marker is what keeps a
+    // drill from reading as a genuine emergency, not a change to WHO gets notified.
+    const headline = e.is_drill ? `${DRILL_PREFIX}${rawHeadline}` : rawHeadline;
 
     const alert = await repo.insertAlert(this.db, {
       hazardEventId: eventId,

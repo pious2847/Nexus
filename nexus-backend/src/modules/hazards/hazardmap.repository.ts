@@ -34,7 +34,7 @@ export interface EventFeatureFilter {
 export async function listEventFeatures(db: Db, f: EventFeatureFilter): Promise<EventFeatureRow[]> {
   if (f.asOf) return listEventFeaturesAsOf(db, f.asOf, f);
 
-  const conds = [sql`e.state <> 'closed'`];
+  const conds = [sql`e.state <> 'closed'`, sql`NOT e.is_drill`];
   if (f.hazardType) conds.push(sql`e.hazard_type = ${f.hazardType}`);
   if (f.severity) conds.push(sql`e.severity = ${f.severity}`);
   if (f.regionId) conds.push(sql`p.path <@ (SELECT path FROM places WHERE id = ${f.regionId})`);
@@ -63,7 +63,7 @@ export async function listEventFeatures(db: Db, f: EventFeatureFilter): Promise<
  * (the map only ever shows non-closed events, live or historical).
  */
 async function listEventFeaturesAsOf(db: Db, asOf: Date, f: EventFeatureFilter): Promise<EventFeatureRow[]> {
-  const conds = [sql`e.created_at <= ${asOf}`, sql`st.to_state <> 'closed'`];
+  const conds = [sql`e.created_at <= ${asOf}`, sql`st.to_state <> 'closed'`, sql`NOT e.is_drill`];
   if (f.hazardType) conds.push(sql`e.hazard_type = ${f.hazardType}`);
   if (f.severity) conds.push(sql`e.severity = ${f.severity}`);
   if (f.regionId) conds.push(sql`p.path <@ (SELECT path FROM places WHERE id = ${f.regionId})`);
@@ -112,7 +112,7 @@ export async function listDistrictRisk(db: Db): Promise<DistrictRiskRow[]> {
       SELECT p.path AS event_path, e.hazard_type,
         CASE e.severity WHEN 'extreme' THEN 4 WHEN 'severe' THEN 3 WHEN 'moderate' THEN 2 WHEN 'minor' THEN 1 ELSE 0 END AS rank
       FROM hazard_events e JOIN places p ON e.place_id = p.id
-      WHERE e.state <> 'closed'
+      WHERE e.state <> 'closed' AND NOT e.is_drill
     )
     SELECT d.id, d.name, ST_AsGeoJSON(d.boundary) AS geom_json,
            MAX(a.rank) AS max_rank,
@@ -135,7 +135,7 @@ export interface NationalSummaryRow {
 export async function nationalSummary(db: Db): Promise<NationalSummaryRow[]> {
   const r = await db.execute(sql`
     SELECT hazard_type, severity, count(*)::int AS count
-    FROM hazard_events WHERE state <> 'closed'
+    FROM hazard_events WHERE state <> 'closed' AND NOT is_drill
     GROUP BY hazard_type, severity
     ORDER BY hazard_type, severity
   `);

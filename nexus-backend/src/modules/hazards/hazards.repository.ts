@@ -34,10 +34,11 @@ export interface HazardEvent {
   source: string;
   created_by: string | null;
   created_at: string;
+  is_drill: boolean;
 }
 
 const EVENT_COLS = sql`id, hazard_type, place_id, state, severity, urgency, certainty, color,
-  title, description, confidence, impact_summary, started_at, expires_at, closed_at, source, created_by, created_at`;
+  title, description, confidence, impact_summary, started_at, expires_at, closed_at, source, created_by, created_at, is_drill`;
 
 // ── Hazard types ─────────────────────────────────────────────────────────────
 export async function listHazardTypes(db: Db, includeDisabled = false): Promise<HazardType[]> {
@@ -101,15 +102,16 @@ export interface CreateEventInput {
   severity?: string | null; urgency?: string | null; certainty?: string | null; color?: string | null;
   title: string; description?: string | null; confidence?: number | null;
   startedAt?: Date | null; expiresAt?: Date | null; source: string; createdBy?: string | null;
+  isDrill?: boolean;
 }
 
 export async function insertEvent(db: Db, e: CreateEventInput): Promise<HazardEvent> {
   const r = await db.execute(sql`
     INSERT INTO hazard_events (hazard_type, place_id, state, severity, urgency, certainty, color,
-      title, description, confidence, started_at, expires_at, source, created_by)
+      title, description, confidence, started_at, expires_at, source, created_by, is_drill)
     VALUES (${e.hazardType}, ${e.placeId ?? null}, ${e.state}, ${e.severity ?? null}, ${e.urgency ?? null},
       ${e.certainty ?? null}, ${e.color ?? null}, ${e.title}, ${e.description ?? null}, ${e.confidence ?? null},
-      ${e.startedAt ?? null}, ${e.expiresAt ?? null}, ${e.source}, ${e.createdBy ?? null})
+      ${e.startedAt ?? null}, ${e.expiresAt ?? null}, ${e.source}, ${e.createdBy ?? null}, ${e.isDrill ?? false})
     RETURNING ${EVENT_COLS}
   `);
   return r.rows[0] as unknown as HazardEvent;

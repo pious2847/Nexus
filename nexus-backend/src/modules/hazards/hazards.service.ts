@@ -25,6 +25,11 @@ export interface RaiseEventInput {
   confidence?: number | null;
   expiresAt?: Date | null;
   source?: 'manual' | 'auto';
+  /** N13 — drill/test mode. Defaults false; a drill exercises the full pipeline
+   *  (check-ins, dispatch, COP) but is excluded from the public hazard map and
+   *  executive analytics by default, and every published alert derived from it
+   *  gets a "TEST DRILL" prefix (see AlertsService.draftFromEvent). */
+  isDrill?: boolean;
 }
 
 export class HazardService {
@@ -92,6 +97,7 @@ export class HazardService {
       expiresAt: input.expiresAt ?? null,
       source: input.source ?? 'manual',
       createdBy: actorId ?? null,
+      isDrill: input.isDrill ?? false,
     };
     const event = await repo.insertEvent(this.db, create);
     await repo.insertTransition(this.db, { eventId: event.id, fromState: null, toState: state, actorId, reason: 'created' });
@@ -158,7 +164,9 @@ export class HazardService {
 
     // Anticipatory action (N12): fire-once forecast-based protocols keyed on
     // (hazard_type, place, trigger_state). Never blocks the transition itself.
-    if (updated.place_id) {
+    // Skipped entirely for drills (N13) — its notify_focal_points action sends real
+    // SMS/email to real focal points, exactly the "real panic" a drill must avoid.
+    if (updated.place_id && !updated.is_drill) {
       try {
         await this.anticipatory?.checkAndActivate({
           id: updated.id,

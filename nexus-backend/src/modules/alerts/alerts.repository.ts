@@ -50,13 +50,14 @@ export interface EventForAlert {
   urgency: string | null;
   certainty: string | null;
   title: string;
+  is_drill: boolean;
 }
 
 export async function getEventForAlert(db: Db, eventId: string): Promise<EventForAlert | null> {
   const r = await db.execute(sql`
     SELECT e.hazard_type, ht.category, ht.label, e.place_id,
            p.name AS place_name, p.path::text AS place_path,
-           e.severity, e.urgency, e.certainty, e.title
+           e.severity, e.urgency, e.certainty, e.title, e.is_drill
     FROM hazard_events e
     JOIN hazard_types ht ON e.hazard_type = ht.code
     LEFT JOIN places p ON e.place_id = p.id
