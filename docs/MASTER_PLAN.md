@@ -935,6 +935,22 @@ Each phase is shippable and demoable on its own.
       active severe-flood district was correctly flagged `hazard_affected: true` with
       the affecting hazard type, ranked appropriately, and returned a correct
       bearing/distance/compass-point heading.
+- [x] **Accessibility & no-literacy alerting (N5)** — live-verified 2026-07-10.
+      `GET /api/v1/warnings/:id/accessible` (public, no auth): a hazard-type
+      pictogram/emoji + severity colour band (`HAZARD_ICONS` added to `@nexus/shared`
+      alongside the existing `SEVERITY_COLORS`) and a short, plain-language script
+      written for text-to-speech/read-aloud consumption — a warning nobody can read or
+      hear isn't a warning. **Deliberately not built:** an actual voice/IVR call
+      channel — Arkesel's voice product needs real telephony integration, a separate,
+      larger undertaking, so this ships the *text* a future voice channel or
+      screen-reader PWA view can consume as-is, not a live phone call. **Real bug found
+      + fixed while wiring this up:** `warnings.event_type` is a human-readable label
+      ("Flood Warning", copied from `hazard_types.label` at draft time), not the
+      machine hazard-type code — using it directly for the icon lookup silently failed
+      every time. Fixed by joining back through `hazard_event_id` to the real code
+      (`getAlertHazardTypeCode()`); caught via live verification against a real
+      published warning (404 first, diagnosed, fixed, re-verified 200 with the correct
+      icon/colour/script), not by code inspection alone.
 - [ ] PWA offline-first hardening (**degraded-mode, N8**)
 - [ ] i18n (first local languages)
 
