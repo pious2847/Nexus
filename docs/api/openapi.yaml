@@ -1,23 +1,107 @@
 openapi: 3.0.3
 info:
   title: N.E.X.U.S. API
-  version: 2.0.0
+  version: 3.0.0
   description: >
     National multi-hazard disaster-intelligence platform for Ghana. This spec covers
-    the endpoints implemented in the new TypeScript core (Phase 0). Legacy sanitation
-    endpoints under /api/v1/* continue to work and will be documented as they migrate.
+    the full TypeScript core API mounted by `nexus-backend/src/core/http/register.ts`
+    (Phases 0-3: identity/geography, multi-hazard early warning, life-safety, emergency
+    response, admin/analytics, and the Data Hub). Legacy sanitation endpoints under
+    `/api/v1/*` (controllers in `src/controllers`) are a separate, still-running system
+    and are not covered here.
+
+    **Auth model**: most routes take a `Bearer` JWT (see `POST /auth-v2/otp/verify` to
+    obtain one). A JWT alone is not sufficient for most mutating routes — the bearer's
+    RBAC v2 role grants (see `/admin/users/:id/roles`) determine which `permission`
+    checks pass. Every protected route below documents its required permission and
+    whether the check is **geo-scoped** (the caller's grant must cover the target
+    place, or an ancestor of it) or **national-scope** (only a grant with no place
+    restriction passes, regardless of the target). A handful of routes accept an
+    `X-API-Key` header instead of a JWT (Data Hub dataset downloads only).
+
+    **Envelope**: nearly every JSON response is `{ success, data?, count?, message?,
+    errors? }`. A few routes deliberately return a raw payload instead (GeoJSON map/
+    boundary endpoints, the printable notice-sheet HTML) — each is called out where it
+    applies.
 servers:
   - url: http://localhost:5000/api/v1
-    description: Local dev
+    description: Local dev (legacy Express app; TS core routers mounted alongside)
+  - url: http://localhost:5091/api/v1
+    description: Local dev (tsx runtime, port used throughout this session's live verification)
+
+tags:
+  - { name: Auth, description: Phone-OTP login, token refresh/logout }
+  - { name: Geography, description: Ghana's 16-region/261-district place tree, boundaries }
+  - { name: Hazards, description: Hazard types + the hazard-event lifecycle state machine }
+  - { name: Hazard Map, description: National multi-hazard map (GeoJSON), historical playback }
+  - { name: Incident Reports, description: Citizen incident reporting, verification, AI triage, promotion to a hazard event }
+  - { name: Warnings, description: CAP-aligned alert drafting/publishing, signing/verification, accessibility }
+  - { name: Notifications, description: In-app notifications, per-place subscriptions, channel preferences, web-push }
+  - { name: SMS Intake, description: Inbound SMS webhook (reports/check-ins/SOS by keyword) }
+  - { name: Vulnerable Persons, description: Pre-disaster evacuation-assistance registry (N4) }
+  - { name: Health Facilities, description: Facility registry + live capacity (N16) }
+  - { name: Health Cases, description: Disease case surveillance }
+  - { name: Safety Check-ins, description: "\"I'm Safe\" check-ins (N1)" }
+  - { name: SOS, description: SOS / panic-button alerts (N2) }
+  - { name: Community Focal Points, description: Last-mile relay registry (N6) }
+  - { name: Missing Persons, description: Missing-persons & family reunification (N3) }
+  - { name: Rumors, description: Rumor intake, review, and official myth-vs-fact clarifications (N11) }
+  - { name: Anticipatory Action, description: Forecast-based trigger protocols (N12) }
+  - { name: Evacuation, description: Hazard-aware nearest-safe-place suggestions (N7) }
+  - { name: Common Operating Picture, description: Per-event command-center aggregation + ICS roles (N14) }
+  - { name: Shelters, description: Shelter/safe-zone registry + occupancy }
+  - { name: Relief, description: Relief stock levels + distributions }
+  - { name: Dispatch, description: Incident dispatch/task board }
+  - { name: Volunteers, description: Volunteer roster + task matching }
+  - { name: Response Assets, description: Vehicles/boats/equipment registry }
+  - { name: Response Timeline, description: Merged after-action timeline for a hazard event }
+  - { name: Admin, description: System health, integration status (super_admin) }
+  - { name: Admin Users, description: User account + role-grant management }
+  - { name: Admin Organizations, description: Organization/team management }
+  - { name: Assessments, description: Rapid damage & needs assessment + situation reports (N15) }
+  - { name: Analytics, description: Cross-module executive summary + trend charts }
+  - { name: Badges, description: Light gamification for verified citizen reporters }
+  - { name: Data Hub, description: Dataset catalog, sharing modes, request workflow, API keys }
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Obtain via `POST /auth-v2/otp/verify`. The JWT alone grants identity; RBAC v2
+        permission grants (managed via `/admin/users/:id/roles`) determine what the
+        bearer can actually do — see each route's `x-permission` note.
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: >
+        Data Hub partner integration key (`POST /datahub/api-keys`). Alternative to a
+        JWT on `GET /datahub/datasets/:id/download` only. Grants download access
+        equivalent to the issuing org's membership — never catalog-curation rights.
+
   schemas:
     Envelope:
       type: object
       properties:
         success: { type: boolean }
         message: { type: string }
+        count: { type: integer }
         data: {}
+    ErrorEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string }
+        errors:
+          type: object
+          description: Present on 400s from Zod validation failures (`.flatten()` shape).
+          properties:
+            formErrors: { type: array, items: { type: string } }
+            fieldErrors: { type: object, additionalProperties: { type: array, items: { type: string } } }
+
     Place:
       type: object
       properties:
@@ -26,8 +110,10 @@ components:
         level: { type: string, enum: [country, region, district, constituency, community] }
         code: { type: string, nullable: true }
         name: { type: string }
+        category: { type: string, nullable: true }
         population: { type: integer, nullable: true }
-        path: { type: string }
+        path: { type: string, description: ltree path, e.g. 'ghana.northern.tolon' }
+
     Tokens:
       type: object
       properties:
@@ -35,43 +121,753 @@ components:
         accessToken: { type: string }
         refreshToken: { type: string }
 
+    HazardType:
+      type: object
+      properties:
+        code: { type: string, example: flood }
+        label: { type: string }
+        category: { type: string }
+        default_thresholds: { type: object }
+        signal_sources: { type: object }
+        evaluator_key: { type: string }
+        lead_time_hours: { type: integer, nullable: true }
+        enabled: { type: boolean }
+
+    HazardEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        hazard_type: { type: string, enum: [flood, heavy_rainfall, drought, bushfire, disease_outbreak, windstorm, extreme_heat, sanitation_failure] }
+        place_id: { type: string, format: uuid, nullable: true }
+        state: { type: string, enum: [predicted, watch, warning, active, response, recovery, closed] }
+        severity: { type: string, enum: [minor, moderate, severe, extreme], nullable: true }
+        urgency: { type: string, nullable: true }
+        certainty: { type: string, nullable: true }
+        color: { type: string, nullable: true }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        confidence: { type: number, nullable: true }
+        impact_summary: { type: object }
+        started_at: { type: string, format: date-time, nullable: true }
+        expires_at: { type: string, format: date-time, nullable: true }
+        closed_at: { type: string, format: date-time, nullable: true }
+        source: { type: string, enum: [manual, auto] }
+        created_by: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+        is_drill: { type: boolean, description: "N13 — a drill event; excluded from the public hazard map + analytics, real fan-out suppressed." }
+
+    EventTransition:
+      type: object
+      properties:
+        from_state: { type: string, nullable: true }
+        to_state: { type: string }
+        actor_id: { type: string, format: uuid, nullable: true }
+        reason: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    IncidentReport:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        reporter_id: { type: string, format: uuid, nullable: true }
+        reporter_phone: { type: string, nullable: true }
+        hazard_type: { type: string, nullable: true }
+        place_id: { type: string, format: uuid, nullable: true }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        media: { type: array, items: { type: string, format: uri } }
+        status: { type: string, enum: [submitted, pending, verified, rejected] }
+        confidence: { type: number }
+        corroboration_count: { type: integer }
+        cluster_id: { type: string, format: uuid, nullable: true }
+        verified_by: { type: string, format: uuid, nullable: true }
+        promoted_event_id: { type: string, format: uuid, nullable: true }
+        source: { type: string, enum: [pwa, sms, whatsapp, voice] }
+        created_at: { type: string, format: date-time }
+
+    TriageSuggestion:
+      type: object
+      description: AI-assisted (Gemini) triage suggestion. Advisory only — never mutates the report.
+      properties:
+        suggestedStatus: { type: string, enum: [verified, pending, rejected] }
+        suggestedHazardType: { type: string, nullable: true }
+        confidencePercent: { type: integer, minimum: 0, maximum: 100 }
+        reasoning: { type: string }
+        duplicateLikely: { type: boolean }
+        available: { type: boolean, description: false if GEMINI_API_KEY unset or the call failed — a graceful degrade, not an error. }
+
+    Warning:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        hazard_event_id: { type: string, format: uuid, nullable: true }
+        place_id: { type: string, format: uuid, nullable: true }
+        category: { type: string }
+        event_type: { type: string, description: "Human-readable label (e.g. 'Flood Warning'), NOT the hazard_type machine code." }
+        severity: { type: string }
+        urgency: { type: string }
+        certainty: { type: string }
+        headline: { type: string }
+        description: { type: string, nullable: true }
+        instruction: { type: string, nullable: true }
+        area_desc: { type: string, nullable: true }
+        status: { type: string, enum: [draft, published] }
+        recipients: { type: integer }
+        sms_attempted: { type: integer }
+        sms_delivered: { type: integer }
+        whatsapp_attempted: { type: integer }
+        whatsapp_delivered: { type: integer }
+        email_attempted: { type: integer }
+        email_delivered: { type: integer }
+        focal_points_notified: { type: integer }
+        signature: { type: string, nullable: true }
+        signing_key_id: { type: string, nullable: true }
+        signed_at: { type: string, format: date-time, nullable: true }
+        published_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    AccessibleAlert:
+      type: object
+      description: N5 — accessibility & no-literacy alerting.
+      properties:
+        icon: { type: string, example: "🌊" }
+        color: { type: string, nullable: true, example: "#EF6C00" }
+        audioScript: { type: string, description: Short plain-language script written for text-to-speech / read-aloud. }
+        pictogramDescription: { type: string }
+
+    NotificationRow:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string }
+        title: { type: string }
+        body: { type: string }
+        data: { type: object }
+        read_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    VulnerablePerson:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        place_id: { type: string, format: uuid }
+        full_name: { type: string }
+        category: { type: string, enum: [elderly, disabled, pregnant, chronic_illness, bedridden, unaccompanied_minor, other] }
+        mobility_level: { type: string, enum: [independent, needs_assistance, wheelchair, bedridden] }
+        household_contact_phone: { type: string, nullable: true }
+        household_size: { type: integer, nullable: true }
+        special_needs: { type: string, nullable: true }
+        consent_status: { type: string, enum: [pending, given, guardian_given, declined] }
+        consent_by: { type: string, enum: [self, guardian, reporter_observed], nullable: true }
+        status: { type: string, enum: [active, evacuated, deceased, withdrawn] }
+        registered_by: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    HealthFacility:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        place_id: { type: string, format: uuid }
+        name: { type: string }
+        facility_type: { type: string, enum: [clinic, hospital, chps_compound, health_center] }
+        ownership: { type: string, enum: [government, private, mission, ngo], nullable: true }
+        contact_phone: { type: string, nullable: true }
+        bed_count: { type: integer, nullable: true }
+        status: { type: string, enum: [active, closed] }
+        created_at: { type: string, format: date-time }
+
+    HealthFacilityCapacity:
+      type: object
+      description: "N16 — insert-only time series; every report is a new row, not an overwrite."
+      properties:
+        id: { type: string, format: uuid }
+        facility_id: { type: string, format: uuid }
+        beds_available: { type: integer, nullable: true }
+        blood_units_available: { type: integer, nullable: true }
+        ambulances_available: { type: integer, nullable: true }
+        status: { type: string, enum: [normal, strained, overwhelmed, closed] }
+        reported_at: { type: string, format: date-time }
+
+    DiseaseCase:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        disease_code: { type: string }
+        place_id: { type: string, format: uuid }
+        facility_id: { type: string, format: uuid, nullable: true }
+        case_status: { type: string, enum: [suspected, probable, confirmed, ruled_out] }
+        source: { type: string, enum: [facility, field_worker, citizen] }
+        age_group: { type: string, nullable: true }
+        sex: { type: string, nullable: true }
+        onset_date: { type: string, format: date, nullable: true }
+        reported_at: { type: string, format: date-time }
+        notes: { type: string, nullable: true }
+
+    SafetyCheckin:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        place_id: { type: string, format: uuid }
+        hazard_event_id: { type: string, format: uuid, nullable: true }
+        status: { type: string, enum: [safe, need_help, injured] }
+        subject_name: { type: string, nullable: true }
+        reporter_phone: { type: string, nullable: true }
+        source: { type: string }
+        notes: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    SosAlert:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        place_id: { type: string, format: uuid, nullable: true }
+        geometry: { type: object, description: GeoJSON Point (NOT NULL — SOS always carries a location) }
+        location_precision: { type: string, enum: [gps, district_centroid] }
+        status: { type: string, enum: [open, acknowledged, resolved, false_alarm] }
+        danger_type: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        reporter_phone: { type: string, nullable: true }
+        responders_notified: { type: integer }
+        acknowledged_by: { type: string, format: uuid, nullable: true }
+        acknowledged_at: { type: string, format: date-time, nullable: true }
+        resolved_by: { type: string, format: uuid, nullable: true }
+        resolved_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    CommunityFocalPoint:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        place_id: { type: string, format: uuid }
+        name: { type: string }
+        relay_method: { type: string, enum: [door_to_door, gong_gong, loudhailer, radio_broadcast, notice_board] }
+        station_name: { type: string, nullable: true }
+        contact_phone: { type: string, nullable: true }
+        contact_email: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        active: { type: boolean }
+
+    MissingPerson:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        place_id: { type: string, format: uuid }
+        full_name: { type: string }
+        age_estimate: { type: string, nullable: true }
+        sex: { type: string, nullable: true }
+        distinguishing_features: { type: string, nullable: true }
+        photo_url: { type: string, nullable: true }
+        last_seen_lng: { type: number, nullable: true }
+        last_seen_lat: { type: number, nullable: true }
+        last_seen_at: { type: string, format: date-time, nullable: true }
+        reporter_id: { type: string, format: uuid, nullable: true }
+        reporter_phone: { type: string }
+        relationship_to_missing: { type: string, nullable: true }
+        status: { type: string, enum: [missing, found, reunified, closed] }
+        matched_checkin_id: { type: string, format: uuid, nullable: true }
+        matched_vulnerable_person_id: { type: string, format: uuid, nullable: true }
+        resolved_by: { type: string, format: uuid, nullable: true }
+        resolved_at: { type: string, format: date-time, nullable: true }
+        notes: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    MissingPersonMatchResult:
+      type: object
+      description: "pg_trgm similarity() candidates (threshold >0.3) — discovery only, never an automatic match."
+      properties:
+        missingPerson: { $ref: '#/components/schemas/MissingPerson' }
+        candidates:
+          type: array
+          items:
+            type: object
+            properties:
+              kind: { type: string, enum: [safety_checkin, vulnerable_person] }
+              score: { type: number }
+              record: { type: object }
+
+    RumorReport:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        place_id: { type: string, format: uuid, nullable: true }
+        hazard_event_id: { type: string, format: uuid, nullable: true }
+        description: { type: string }
+        source: { type: string, nullable: true }
+        reporter_id: { type: string, format: uuid, nullable: true }
+        reporter_phone: { type: string, nullable: true }
+        status: { type: string, enum: [reported, reviewing, confirmed_false, confirmed_true, clarified] }
+        reviewed_by: { type: string, format: uuid, nullable: true }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+        resolution_notes: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    MythFactEntry:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        hazard_event_id: { type: string, format: uuid, nullable: true }
+        place_id: { type: string, format: uuid, nullable: true }
+        myth: { type: string }
+        fact: { type: string }
+        rumor_report_id: { type: string, format: uuid, nullable: true }
+        published_by: { type: string, format: uuid }
+        channels_notified: { type: object, example: { focalPointsNotified: 3 } }
+        created_at: { type: string, format: date-time }
+
+    AnticipatoryProtocol:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        hazard_type: { type: string }
+        place_id: { type: string, format: uuid }
+        trigger_state: { type: string }
+        actions:
+          type: array
+          items:
+            type: object
+            properties:
+              type: { type: string, enum: [notify_focal_points, flag_vulnerable_evacuation, pre_position_relief] }
+              params: { type: object }
+        active: { type: boolean }
+        created_by: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    ProtocolActivation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        protocol_id: { type: string, format: uuid }
+        hazard_event_id: { type: string, format: uuid }
+        actions_taken: { type: array, items: { type: object } }
+        triggered_at: { type: string, format: date-time }
+
+    EvacuationSuggestion:
+      type: object
+      description: "N7 — honest scope: hazard-aware ranking + straight-line heading, NOT road-network routing."
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [shelter, health_facility] }
+        name: { type: string }
+        place_id: { type: string, format: uuid }
+        lng: { type: number }
+        lat: { type: number }
+        capacity: { type: integer, nullable: true }
+        current_occupancy: { type: integer, nullable: true }
+        meters: { type: number, description: straight-line distance from the query point }
+        hazard_affected: { type: boolean, description: "true if this place currently has an active severe/extreme hazard — deprioritized, never silently excluded." }
+        hazard_types: { type: array, items: { type: string } }
+        heading:
+          type: object
+          properties:
+            bearingDegrees: { type: integer }
+            compassPoint: { type: string, example: NE }
+            distanceMeters: { type: integer }
+
+    Shelter:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        place_id: { type: string, format: uuid }
+        name: { type: string }
+        capacity: { type: integer, nullable: true }
+        current_occupancy: { type: integer }
+        facilities: { type: array, items: { type: string } }
+        status: { type: string, enum: [open, full, closed] }
+        contact_phone: { type: string, nullable: true }
+        managed_by: { type: string, format: uuid, nullable: true }
+        notes: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ReliefStock:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        place_id: { type: string, format: uuid }
+        shelter_id: { type: string, format: uuid, nullable: true }
+        item_type: { type: string, enum: [food, water, tents, medical_kits, blankets, other] }
+        quantity: { type: integer }
+        unit: { type: string }
+        low_stock_threshold: { type: integer }
+        updated_at: { type: string, format: date-time }
+
+    ReliefDistribution:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        stock_id: { type: string, format: uuid }
+        hazard_event_id: { type: string, format: uuid, nullable: true }
+        quantity: { type: integer }
+        recipient_desc: { type: string, nullable: true }
+        distributed_by: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    DispatchTask:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        hazard_event_id: { type: string, format: uuid, nullable: true }
+        place_id: { type: string, format: uuid, nullable: true }
+        task_type: { type: string, enum: [rescue, assessment, distribution, repair, other] }
+        description: { type: string, nullable: true }
+        priority: { type: string, enum: [low, normal, high, critical] }
+        status: { type: string, enum: [open, assigned, in_progress, done, cancelled] }
+        assigned_to: { type: string, format: uuid, nullable: true }
+        source_type: { type: string, nullable: true }
+        source_id: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+    DispatchTaskEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        task_id: { type: string, format: uuid }
+        from_status: { type: string, nullable: true }
+        to_status: { type: string }
+        actor_id: { type: string, format: uuid, nullable: true }
+        note: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    Volunteer:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid, nullable: true }
+        name: { type: string }
+        phone: { type: string, nullable: true }
+        place_id: { type: string, format: uuid }
+        skills: { type: array, items: { type: string } }
+        availability: { type: string, enum: [available, unavailable, deployed] }
+        assigned_task: { type: string, format: uuid, nullable: true }
+
+    ResponseAsset:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        asset_type: { type: string, enum: [vehicle, boat, equipment, other] }
+        place_id: { type: string, format: uuid }
+        status: { type: string, enum: [available, deployed, maintenance] }
+        assigned_task: { type: string, format: uuid, nullable: true }
+        notes: { type: string, nullable: true }
+
+    TimelineEntry:
+      type: object
+      description: Merged chronologically from dispatch_task_events + relief_distributions.
+      properties:
+        type: { type: string, enum: [dispatch_event, relief_distribution] }
+        occurred_at: { type: string, format: date-time }
+        detail: { type: object }
+
+    AdminUser:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        status: { type: string, enum: [active, suspended] }
+        reputation_score: { type: integer }
+        org_id: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+        roles:
+          type: array
+          nullable: true
+          items:
+            type: object
+            properties:
+              roleCode: { type: string }
+              placeId: { type: string, format: uuid, nullable: true }
+              placeName: { type: string, nullable: true }
+
+    RoleGrant:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        role_code: { type: string }
+        place_id: { type: string, format: uuid, nullable: true }
+        place_name: { type: string, nullable: true }
+        granted_by: { type: string, format: uuid, nullable: true }
+        granted_at: { type: string, format: date-time }
+
+    Organization:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        type: { type: string, enum: [ngo, government_agency, assembly, research, media, other] }
+        verified: { type: boolean }
+        contact: { type: object }
+        metadata: { type: object }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    DamageAssessment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        place_id: { type: string, format: uuid }
+        hazard_event_id: { type: string, format: uuid, nullable: true }
+        households_affected: { type: integer }
+        persons_affected: { type: integer }
+        casualties: { type: integer }
+        injuries: { type: integer }
+        infrastructure_damage: { type: string, nullable: true }
+        urgent_needs: { type: array, items: { type: string } }
+        notes: { type: string, nullable: true }
+        assessed_by: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    SituationReport:
+      type: object
+      properties:
+        scopePlaceId: { type: string, format: uuid }
+        hazardEventId: { type: string, format: uuid, nullable: true }
+        totalAssessments: { type: integer }
+        householdsAffected: { type: integer }
+        personsAffected: { type: integer }
+        casualties: { type: integer }
+        injuries: { type: integer }
+        urgentNeeds:
+          type: array
+          items:
+            type: object
+            properties: { need: { type: string }, count: { type: integer } }
+
+    IcsRole:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        hazard_event_id: { type: string, format: uuid }
+        role_title: { type: string, enum: [incident_commander, operations, planning, logistics, finance_admin, safety_officer, liaison_officer, public_information_officer] }
+        user_id: { type: string, format: uuid }
+        user_name: { type: string }
+        assigned_by: { type: string, format: uuid, nullable: true }
+        assigned_at: { type: string, format: date-time }
+        relieved_at: { type: string, format: date-time, nullable: true }
+
+    CopSnapshot:
+      type: object
+      description: "N14 — one-call aggregation of everything already linked to a hazard event."
+      properties:
+        event:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            hazard_type: { type: string }
+            place_id: { type: string, format: uuid, nullable: true }
+            title: { type: string }
+            state: { type: string }
+            severity: { type: string, nullable: true }
+            started_at: { type: string, format: date-time, nullable: true }
+            created_at: { type: string, format: date-time }
+        counts:
+          type: object
+          properties:
+            reports_linked: { type: integer }
+            reports_in_area: { type: integer }
+            dispatch_open: { type: integer }
+            dispatch_in_progress: { type: integer }
+            dispatch_done: { type: integer }
+            checkins_safe: { type: integer }
+            checkins_need_help: { type: integer }
+            checkins_injured: { type: integer }
+            sos_open: { type: integer }
+            sos_acknowledged: { type: integer }
+            shelters_open: { type: integer }
+            shelters_full: { type: integer }
+            shelter_occupancy: { type: integer }
+            shelter_capacity: { type: integer }
+            relief_distributions: { type: integer }
+            rumors_open: { type: integer }
+        situationReport: { allOf: [{ $ref: '#/components/schemas/SituationReport' }], nullable: true }
+        commandRoles: { type: array, items: { $ref: '#/components/schemas/IcsRole' } }
+
+    ExecutiveSummary:
+      type: object
+      properties:
+        activeHazardsBySeverity:
+          type: array
+          items: { type: object, properties: { severity: { type: string, nullable: true }, count: { type: integer } } }
+        reports30d:
+          type: object
+          properties: { total: { type: integer }, verified: { type: integer }, pending: { type: integer } }
+        diseaseCases30d:
+          type: array
+          items: { type: object, properties: { disease_code: { type: string }, count: { type: integer } } }
+        dispatchTasksByStatus:
+          type: array
+          items: { type: object, properties: { status: { type: string }, count: { type: integer } } }
+        sos30d:
+          type: object
+          properties: { open: { type: integer }, acknowledged: { type: integer }, avgAckSeconds: { type: integer, nullable: true } }
+        shelters:
+          type: object
+          properties:
+            open: { type: integer }
+            full: { type: integer }
+            closed: { type: integer }
+            totalCapacity: { type: integer }
+            totalOccupancy: { type: integer }
+        vulnerablePersons: { type: integer }
+
+    MonthlyHazardTrend:
+      type: object
+      properties:
+        month: { type: string, example: '2026-07' }
+        hazard_type: { type: string }
+        count: { type: integer }
+
+    Badge:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        description: { type: string }
+        icon: { type: string, nullable: true }
+        criteria_type: { type: string, enum: [verified_count, reputation_threshold] }
+        criteria_value: { type: integer }
+
+    UserBadge:
+      allOf:
+        - $ref: '#/components/schemas/Badge'
+        - type: object
+          properties: { awarded_at: { type: string, format: date-time } }
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        user_id: { type: string, format: uuid }
+        name: { type: string }
+        reputation_score: { type: integer }
+        verified_count: { type: integer }
+        badge_count: { type: integer }
+
+    Dataset:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        category: { type: string, nullable: true }
+        place_id: { type: string, format: uuid, nullable: true }
+        time_range_start: { type: string, format: date, nullable: true }
+        time_range_end: { type: string, format: date, nullable: true }
+        format: { type: string, enum: [csv, geojson, excel, pdf, json] }
+        file_url: { type: string, nullable: true }
+        file_size_bytes: { type: integer, nullable: true }
+        row_count: { type: integer, nullable: true }
+        license: { type: string, enum: [cc_by, cc_by_sa, cc0, open_data, restricted, proprietary] }
+        attribution: { type: string, nullable: true }
+        sharing_mode: { type: string, enum: [public, by_request, private] }
+        contains_pii: { type: boolean, description: "A dataset can never be public AND contains_pii=true — enforced by a DB CHECK constraint plus an app-layer 400." }
+        status: { type: string, enum: [draft, pending_review, published, rejected, archived] }
+        org_id: { type: string, format: uuid, nullable: true }
+        created_by: { type: string, format: uuid, nullable: true }
+        reviewed_by: { type: string, format: uuid, nullable: true }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+        published_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    DataRequest:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        dataset_id: { type: string, format: uuid }
+        requester_id: { type: string, format: uuid }
+        requester_name: { type: string }
+        justification: { type: string }
+        status: { type: string, enum: [pending, approved, denied] }
+        reviewed_by: { type: string, format: uuid, nullable: true }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+        review_notes: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    DatasetUsageStats:
+      type: object
+      properties:
+        total_downloads: { type: integer }
+        unique_downloaders: { type: integer }
+        requests_pending: { type: integer }
+        requests_approved: { type: integer }
+        requests_denied: { type: integer }
+
+    ApiKey:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid, nullable: true }
+        name: { type: string }
+        key_prefix: { type: string, description: First 14 chars of the raw key, for display only. }
+        created_by: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+        last_used_at: { type: string, format: date-time, nullable: true }
+        revoked_at: { type: string, format: date-time, nullable: true }
+
+    ApiKeyCreated:
+      allOf:
+        - $ref: '#/components/schemas/ApiKey'
+        - type: object
+          properties:
+            rawKey: { type: string, description: "Shown ONCE, here, at creation. Never returned again — only key_hash is persisted." }
+
+  responses:
+    BadRequest:
+      description: Validation failure or a business-rule error.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    Unauthorized:
+      description: Missing/invalid bearer token.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    Forbidden:
+      description: Authenticated, but the caller's RBAC grants don't cover this permission/place.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    NotFound:
+      description: Resource not found.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+
+security:
+  - bearerAuth: []
+
 paths:
   /health:
     get:
       summary: Service health
+      security: []
       responses:
         '200': { description: OK }
 
+  # ── Auth ──────────────────────────────────────────────────────────────────
   /auth-v2/otp/request:
     post:
+      tags: [Auth]
       summary: Request a phone login OTP
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [phone]
-              properties:
-                phone: { type: string, example: '+233201234567' }
+            schema: { type: object, required: [phone], properties: { phone: { type: string, example: '+233201234567' } } }
       responses:
-        '200': { description: OTP sent (devCode returned in non-production) }
-        '400': { description: Invalid phone }
-        '429': { description: Resend cooldown }
+        '200': { description: 'OTP sent (data: { sent, expiresAt, devCode? })' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { description: Resend cooldown not elapsed }
 
   /auth-v2/otp/verify:
     post:
-      summary: Verify OTP and log in (creates a citizen on first login)
+      tags: [Auth]
+      summary: Verify OTP and log in (creates a citizen account on first login)
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [phone, code]
-              properties:
-                phone: { type: string }
-                code: { type: string, example: '123456' }
+            schema: { type: object, required: [phone, code], properties: { phone: { type: string }, code: { type: string, example: '123456' } } }
       responses:
         '200':
           description: Logged in
@@ -81,80 +877,2302 @@ paths:
                 allOf:
                   - $ref: '#/components/schemas/Envelope'
                   - properties: { data: { $ref: '#/components/schemas/Tokens' } }
-        '401': { description: Invalid/expired code }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Invalid/expired/too-many-attempts code }
 
   /auth-v2/refresh:
     post:
+      tags: [Auth]
       summary: Rotate a refresh token
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [refreshToken]
-              properties: { refreshToken: { type: string } }
+            schema: { type: object, required: [refreshToken], properties: { refreshToken: { type: string } } }
       responses:
         '200': { description: New token pair }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { description: Invalid/expired refresh token }
 
   /auth-v2/logout:
     post:
+      tags: [Auth]
       summary: Revoke a refresh token
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [refreshToken]
-              properties: { refreshToken: { type: string } }
+            schema: { type: object, required: [refreshToken], properties: { refreshToken: { type: string } } }
       responses:
         '200': { description: Logged out }
+        '400': { $ref: '#/components/responses/BadRequest' }
 
+  # ── Geography ─────────────────────────────────────────────────────────────
   /geography/regions:
     get:
+      tags: [Geography]
       summary: List the 16 regions
+      security: []
       responses:
         '200':
           description: Regions
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/Envelope'
-                  - properties:
-                      data: { type: array, items: { $ref: '#/components/schemas/Place' } }
+                allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/Place' } } } }]
 
   /geography/districts:
     get:
+      tags: [Geography]
       summary: List districts (optionally filtered by region)
+      security: []
       parameters:
-        - in: query
-          name: region
-          schema: { type: string }
-          description: Region name or id
+        - { in: query, name: region, schema: { type: string }, description: Region name or id }
       responses:
-        '200': { description: Districts }
+        '200': { description: 'Districts (count + data[])' }
 
   /geography/resolve:
     get:
-      summary: Resolve a legacy district string to a place (normalized + fuzzy)
+      tags: [Geography]
+      summary: Resolve a free-text district string to a place (normalized + fuzzy)
+      security: []
       parameters:
-        - in: query
-          name: q
-          required: true
-          schema: { type: string, example: 'Sagnarigu' }
+        - { in: query, name: q, required: true, schema: { type: string, example: Sagnarigu } }
       responses:
-        '200': { description: Resolve result or null }
-        '400': { description: Missing q }
+        '200': { description: 'Resolve result { placeId, name, matchType, distance } or null' }
+        '400': { $ref: '#/components/responses/BadRequest' }
 
   /geography/district-for-point:
     get:
+      tags: [Geography]
       summary: District whose boundary contains a point
+      security: []
       parameters:
         - { in: query, name: lng, required: true, schema: { type: number } }
         - { in: query, name: lat, required: true, schema: { type: number } }
       responses:
-        '200': { description: Containing district or null }
-        '400': { description: Missing/invalid coordinates }
+        '200': { description: Containing district (Place) or null }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /geography/boundaries:
+    get:
+      tags: [Geography]
+      summary: Bulk boundary FeatureCollection
+      description: >
+        **Not envelope-wrapped** — returns a raw GeoJSON `FeatureCollection` directly:
+        `{ type, features: [{ type, geometry, properties: { id, name, level, hasGeometry } }], meta: { count, generatedAt, layer } }`.
+        A district with no stored boundary gets `geometry: null, hasGeometry: false` rather than being dropped.
+      security: []
+      parameters:
+        - { in: query, name: level, schema: { type: string, default: district } }
+        - { in: query, name: region, schema: { type: string } }
+      responses:
+        '200': { description: FeatureCollection }
+
+  /geography/{id}/boundary:
+    get:
+      tags: [Geography]
+      summary: Single place's boundary
+      description: "**Not envelope-wrapped** — returns a raw GeoJSON `Feature` directly."
+      security: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: GeoJSON Feature }
+        '404': { description: 'Place not found, or has no boundary geometry yet' }
+
+  # ── Hazards ───────────────────────────────────────────────────────────────
+  /hazards/types:
+    get:
+      tags: [Hazards]
+      summary: List hazard types (config-driven registry)
+      security: []
+      responses:
+        '200':
+          description: Hazard types
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/HazardType' } } } }] } } }
+
+  /hazards/types/{code}:
+    patch:
+      tags: [Hazards]
+      summary: Edit a hazard type's runtime config (thresholds, label, lead time, enabled)
+      description: 'x-permission: `config.manage` (national-scope)'
+      parameters:
+        - { in: path, name: code, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label: { type: string }
+                category: { type: string }
+                thresholds: { type: object }
+                leadTimeHours: { type: integer, nullable: true }
+                enabled: { type: boolean }
+      responses:
+        '200': { description: Updated HazardType }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /hazards/events:
+    get:
+      tags: [Hazards]
+      summary: List hazard events
+      security: []
+      parameters:
+        - { in: query, name: type, schema: { type: string }, description: hazard type code }
+        - { in: query, name: place, schema: { type: string, format: uuid } }
+        - { in: query, name: state, schema: { type: string } }
+        - { in: query, name: severity, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer } }
+      responses:
+        '200': { description: 'count + data: HazardEvent[]' }
+    post:
+      tags: [Hazards]
+      summary: Raise a new hazard event
+      description: 'x-permission: `hazard.event.create` (geo-scoped to `placeId`, or national if omitted)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hazardType, title]
+              properties:
+                hazardType: { type: string, enum: [flood, heavy_rainfall, drought, bushfire, disease_outbreak, windstorm, extreme_heat, sanitation_failure] }
+                placeId: { type: string, format: uuid }
+                title: { type: string, minLength: 3 }
+                description: { type: string }
+                state: { type: string, enum: [predicted, watch, warning, active, response, recovery, closed] }
+                severity: { type: string, enum: [minor, moderate, severe, extreme] }
+                urgency: { type: string }
+                certainty: { type: string }
+                confidence: { type: number }
+                isDrill: { type: boolean, description: 'N13 — drill/test mode, default false' }
+      responses:
+        '201': { description: Created HazardEvent }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /hazards/events/{id}:
+    get:
+      tags: [Hazards]
+      summary: Hazard event detail + transition history
+      security: []
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 'HazardEvent + { transitions: EventTransition[] }' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /hazards/events/{id}/transition:
+    post:
+      tags: [Hazards]
+      summary: Transition a hazard event's lifecycle state
+      description: >
+        x-permission: `hazard.event.transition` (geo-scoped to the event's place). Validated against
+        the forward-only state machine (predicted→watch→warning→active→response→recovery→closed).
+        Also the trigger point for N12 anticipatory-action protocols (skipped for drills) and N9
+        (fan-out is a separate `/warnings/from-event`+`/publish` call, not automatic here).
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [toState]
+              properties: { toState: { type: string, enum: [predicted, watch, warning, active, response, recovery, closed] }, reason: { type: string } }
+      responses:
+        '200': { description: Updated HazardEvent }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Illegal state transition }
+
+  # ── Hazard Map ────────────────────────────────────────────────────────────
+  /hazard-map/events:
+    get:
+      tags: [Hazard Map]
+      summary: Active hazard-event features for the map
+      description: >
+        **Not envelope-wrapped** — raw GeoJSON `FeatureCollection`. Excludes closed events and,
+        since N13, drills. Supports historical playback via `asOf`.
+      security: []
+      parameters:
+        - { in: query, name: type, schema: { type: string } }
+        - { in: query, name: severity, schema: { type: string } }
+        - { in: query, name: region, schema: { type: string, format: uuid } }
+        - { in: query, name: limit, schema: { type: integer } }
+        - { in: query, name: asOf, schema: { type: string, format: date-time }, description: Reconstructs map state as of this past moment. }
+      responses:
+        '200': { description: FeatureCollection }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /hazard-map/districts:
+    get:
+      tags: [Hazard Map]
+      summary: Per-district worst-case active severity (choropleth)
+      description: "**Not envelope-wrapped** — raw GeoJSON `FeatureCollection`, one feature per district (all 261, even those lacking boundary geometry)."
+      security: []
+      responses:
+        '200': { description: FeatureCollection }
+
+  /hazard-map/summary:
+    get:
+      tags: [Hazard Map]
+      summary: National active-event counts by hazard type + severity
+      security: []
+      responses:
+        '200': { description: '{ totalActive, byHazard: { [type]: { total, bySeverity } } }' }
+
+  # ── Incident Reports ──────────────────────────────────────────────────────
+  /incident-reports:
+    post:
+      tags: [Incident Reports]
+      summary: Submit a citizen incident report
+      description: Works logged-out or in (optionalAuth); if logged in, reporter_id is attached and feeds N4 badges/reputation on later verification.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                hazardType: { type: string }
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                title: { type: string, minLength: 3, maxLength: 200 }
+                description: { type: string, maxLength: 2000 }
+                media: { type: array, items: { type: string, format: uri } }
+                source: { type: string, enum: [pwa, sms, whatsapp, voice] }
+                reporterPhone: { type: string }
+      responses:
+        '201': { description: Created IncidentReport }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    get:
+      tags: [Incident Reports]
+      summary: List incident reports
+      description: 'x-permission: `report.read` (national-scope)'
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: type, schema: { type: string } }
+        - { in: query, name: place, schema: { type: string, format: uuid } }
+        - { in: query, name: limit, schema: { type: integer } }
+      responses:
+        '200': { description: 'count + data: IncidentReport[]' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /incident-reports/{id}:
+    get:
+      tags: [Incident Reports]
+      summary: Incident report detail
+      description: 'x-permission: `report.read` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: IncidentReport }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /incident-reports/{id}/triage:
+    post:
+      tags: [Incident Reports]
+      summary: AI-assisted triage suggestion (advisory only)
+      description: 'x-permission: `report.verify` (geo-scoped to the report''s place). Never mutates the report.'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: TriageSuggestion
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { $ref: '#/components/schemas/TriageSuggestion' } } }] } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /incident-reports/{id}/review:
+    post:
+      tags: [Incident Reports]
+      summary: Verify or reject a report
+      description: 'x-permission: `report.verify` (geo-scoped). Adjusts reporter reputation; verification may award badges.'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [decision], properties: { decision: { type: string, enum: [verified, rejected] }, reason: { type: string } } }
+      responses:
+        '200': { description: Updated IncidentReport }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /incident-reports/{id}/promote:
+    post:
+      tags: [Incident Reports]
+      summary: Promote a report into a new hazard event (state watch)
+      description: 'x-permission: `hazard.event.create` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { hazardType: { type: string }, severity: { type: string }, title: { type: string } }
+      responses:
+        '201': { description: '{ reportId, eventId }' }
+        '400': { description: Invalid body, missing hazardType, or report not found (this route surfaces "not found" as 400, not 404) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ── Warnings ──────────────────────────────────────────────────────────────
+  /warnings:
+    get:
+      tags: [Warnings]
+      summary: List warnings
+      security: []
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer } }
+      responses:
+        '200': { description: 'count + data: Warning[]' }
+
+  /warnings/public-key:
+    get:
+      tags: [Warnings]
+      summary: The Ed25519 public key used to sign published warnings
+      security: []
+      responses:
+        '200': { description: '{ keyId, publicKeyPem, algorithm: "Ed25519" }' }
+        '404': { description: Alert signing not configured }
+
+  /warnings/{id}:
+    get:
+      tags: [Warnings]
+      summary: Warning detail + its CAP JSON representation
+      security: []
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 'Warning + { cap: object }' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /warnings/{id}/verify:
+    get:
+      tags: [Warnings]
+      summary: Independently recompute and verify a warning's Ed25519 signature
+      description: Tamper-evident — mutating the stored row flips `verified:false` on re-check.
+      security: []
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: '{ verified: boolean, signature, keyId, signedAt, cap }' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /warnings/{id}/notice-sheet:
+    get:
+      tags: [Warnings]
+      summary: Printable community notice-board sheet
+      description: "**Not envelope-wrapped** — returns self-contained HTML (`Content-Type: text/html`), not JSON."
+      security: []
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: HTML page, content: { text/html: { schema: { type: string } } } }
+        '404': { description: 'Plain text (not JSON): "Alert not found or not yet published."' }
+
+  /warnings/{id}/accessible:
+    get:
+      tags: [Warnings]
+      summary: 'N5 — accessible view: pictogram, colour, TTS-ready script'
+      security: []
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: AccessibleAlert
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { $ref: '#/components/schemas/AccessibleAlert' } } }] } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /warnings/from-event:
+    post:
+      tags: [Warnings]
+      summary: Draft a CAP alert from a hazard event (status = draft, not yet disseminated)
+      description: >
+        x-permission: `alert.publish.advisory` (national-scope at draft time — the actual
+        tiered permission is enforced at publish time). If the source event `isDrill`, the
+        headline is auto-prefixed with a TEST DRILL marker (inherited by every channel + the signature).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [eventId]
+              properties: { eventId: { type: string, format: uuid }, headline: { type: string, maxLength: 200 }, instruction: { type: string, maxLength: 500 } }
+      responses:
+        '201': { description: Draft Warning }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /warnings/{id}/publish:
+    post:
+      tags: [Warnings]
+      summary: Publish a draft warning — fans out to subscribers
+      description: >
+        x-permission: tiered — `alert.publish.{advisory|watch|severe|extreme}` depending on
+        the warning's severity, geo-scoped to its place, enforced inside the service (not
+        route middleware). Fans out in-app + SMS + WhatsApp + email + community focal points;
+        signs the CAP payload if signing keys are configured.
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 'Published Warning + a delivery-summary message' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { description: 'PublishForbiddenError — insufficient tier for this severity/area' }
+
+  # ── Notifications ─────────────────────────────────────────────────────────
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: The caller's own notifications
+      parameters:
+        - { in: query, name: unread, schema: { type: boolean } }
+        - { in: query, name: limit, schema: { type: integer } }
+      responses:
+        '200': { description: 'count + data: NotificationRow[]' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/{id}/read:
+    post:
+      tags: [Notifications]
+      summary: Mark a notification read
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/subscriptions:
+    get:
+      tags: [Notifications]
+      summary: The caller's place subscriptions
+      responses:
+        '200': { description: 'data: [{ place_id, channels, hazard_types }]' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Notifications]
+      summary: Subscribe to a place
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [placeId, channels]
+              properties:
+                placeId: { type: string, format: uuid }
+                channels: { type: array, minItems: 1, items: { type: string, enum: [in_app, push, sms, whatsapp, email, voice] } }
+                hazardTypes: { type: array, items: { type: string } }
+      responses:
+        '201': { description: Subscribed }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/subscriptions/{placeId}:
+    delete:
+      tags: [Notifications]
+      summary: Unsubscribe from a place
+      parameters: [{ in: path, name: placeId, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Unsubscribed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/preferences:
+    get:
+      tags: [Notifications]
+      summary: The caller's per-channel opt-out preferences
+      responses:
+        '200': { description: 'data: [{ channel, enabled }]' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [Notifications]
+      summary: Set a channel preference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [channel, enabled], properties: { channel: { type: string, enum: [in_app, push, sms, whatsapp, email, voice] }, enabled: { type: boolean } } }
+      responses:
+        '200': { description: OK }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications/push:
+    post:
+      tags: [Notifications]
+      summary: Register a web-push endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint, p256dh, auth]
+              properties: { endpoint: { type: string, format: uri }, p256dh: { type: string }, auth: { type: string } }
+      responses:
+        '201': { description: Registered }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Notifications]
+      summary: Unregister a web-push endpoint
+      parameters: [{ in: query, name: endpoint, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: OK }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ── SMS Intake ────────────────────────────────────────────────────────────
+  /sms-intake/inbound:
+    post:
+      tags: [SMS Intake]
+      summary: Inbound SMS webhook — routes by keyword to reports / check-ins / SOS
+      description: >
+        Not for frontend use — this is the SMS provider's webhook target. Always returns
+        200 (even on failure) to avoid webhook retry storms, except an invalid/missing
+        `token` when `SMS_INBOUND_TOKEN` is configured (403). Payload is normalized via a
+        defensive multi-alias adapter (Arkesel's inbound format isn't publicly documented).
+      security: []
+      parameters: [{ in: query, name: token, schema: { type: string }, description: Required only if SMS_INBOUND_TOKEN is set. }]
+      responses:
+        '200': { description: 'Always 200 on any parseable-or-not outcome — see description.' }
+        '403': { description: Invalid/missing shared-secret token. }
+
+  # ── Vulnerable Persons ────────────────────────────────────────────────────
+  /vulnerable-persons:
+    post:
+      tags: [Vulnerable Persons]
+      summary: Register a vulnerable person
+      description: 'x-permission: `vulnerable.create` (geo-scoped)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, category, consentStatus]
+              properties:
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                fullName: { type: string, minLength: 2, maxLength: 200 }
+                category: { type: string, enum: [elderly, disabled, pregnant, chronic_illness, bedridden, unaccompanied_minor, other] }
+                mobilityLevel: { type: string, enum: [independent, needs_assistance, wheelchair, bedridden], default: needs_assistance }
+                householdContactPhone: { type: string }
+                householdSize: { type: integer, minimum: 0, maximum: 50 }
+                specialNeeds: { type: string, maxLength: 1000 }
+                consentStatus: { type: string, enum: [pending, given, guardian_given, declined] }
+                consentBy: { type: string, enum: [self, guardian, reporter_observed] }
+      responses:
+        '201': { description: Created VulnerablePerson }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Vulnerable Persons]
+      summary: List within a geo scope
+      description: 'x-permission: `vulnerable.read` (geo-scoped to `scope`, required — no national "list everyone" endpoint)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: category, schema: { type: string } }
+        - { in: query, name: sort, schema: { type: string, enum: [priority] }, description: 'sort=priority ranks by category+mobility+household size' }
+      responses:
+        '200': { description: 'count + data: VulnerablePerson[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /vulnerable-persons/{id}:
+    get:
+      tags: [Vulnerable Persons]
+      summary: Detail
+      description: 'x-permission: `vulnerable.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: VulnerablePerson }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /vulnerable-persons/{id}/status:
+    patch:
+      tags: [Vulnerable Persons]
+      summary: Update status (active/evacuated/deceased/withdrawn)
+      description: 'x-permission: `vulnerable.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [status], properties: { status: { type: string, enum: [active, evacuated, deceased, withdrawn] } } } } }
+      responses:
+        '200': { description: Updated VulnerablePerson }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /vulnerable-persons/{id}/consent:
+    patch:
+      tags: [Vulnerable Persons]
+      summary: Update consent
+      description: 'x-permission: `vulnerable.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [consentStatus], properties: { consentStatus: { type: string, enum: [pending, given, guardian_given, declined] }, consentBy: { type: string, enum: [self, guardian, reporter_observed] } } }
+      responses:
+        '200': { description: Updated VulnerablePerson }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Health Facilities ─────────────────────────────────────────────────────
+  /health-facilities/nearest-with-capacity:
+    get:
+      tags: [Health Facilities]
+      summary: Nearest facility with a filed capacity report matching filters
+      security: []
+      parameters:
+        - { in: query, name: lng, required: true, schema: { type: number } }
+        - { in: query, name: lat, required: true, schema: { type: number } }
+        - { in: query, name: minBeds, schema: { type: integer } }
+        - { in: query, name: status, schema: { type: string, enum: [normal, strained, overwhelmed, closed] } }
+        - { in: query, name: limit, schema: { type: integer, default: 5 } }
+      responses:
+        '200': { description: 'count + data' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /health-facilities:
+    post:
+      tags: [Health Facilities]
+      summary: Register a health facility
+      description: 'x-permission: `health.facility.create` (geo-scoped)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                name: { type: string, minLength: 2, maxLength: 200 }
+                facilityType: { type: string, enum: [clinic, hospital, chps_compound, health_center], default: clinic }
+                ownership: { type: string, enum: [government, private, mission, ngo] }
+                contactPhone: { type: string }
+                bedCount: { type: integer, minimum: 0 }
+      responses:
+        '201': { description: Created HealthFacility }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Health Facilities]
+      summary: List within a geo scope
+      description: 'x-permission: `health.facility.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: facilityType, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+      responses:
+        '200': { description: 'count + data: HealthFacility[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /health-facilities/{id}:
+    get:
+      tags: [Health Facilities]
+      summary: Detail
+      description: 'x-permission: `health.facility.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: HealthFacility }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Health Facilities]
+      summary: Update
+      description: 'x-permission: `health.facility.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                facilityType: { type: string, enum: [clinic, hospital, chps_compound, health_center] }
+                ownership: { type: string, enum: [government, private, mission, ngo] }
+                contactPhone: { type: string }
+                bedCount: { type: integer }
+                status: { type: string, enum: [active, closed] }
+      responses:
+        '200': { description: Updated HealthFacility }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /health-facilities/{id}/capacity:
+    post:
+      tags: [Health Facilities]
+      summary: 'N16 — file a new live capacity report (insert-only, not an overwrite)'
+      description: 'x-permission: `health.facility.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                bedsAvailable: { type: integer, minimum: 0 }
+                bloodUnitsAvailable: { type: integer, minimum: 0 }
+                ambulancesAvailable: { type: integer, minimum: 0 }
+                status: { type: string, enum: [normal, strained, overwhelmed, closed] }
+      responses:
+        '201': { description: HealthFacilityCapacity }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    get:
+      tags: [Health Facilities]
+      summary: Latest capacity report
+      description: 'x-permission: `health.facility.read` (geo-scoped). `200 data:null` is valid — a facility with zero reports is not a 404.'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 'HealthFacilityCapacity or null' }
+        '404': { description: Facility itself not found. }
+
+  # ── Health Cases ──────────────────────────────────────────────────────────
+  /health-cases:
+    post:
+      tags: [Health Cases]
+      summary: Report a disease case
+      description: 'x-permission: `health.case.create` (geo-scoped)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [diseaseCode]
+              properties:
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                diseaseCode: { type: string, pattern: '^[a-z0-9_-]+$', description: normalized to lowercase }
+                caseStatus: { type: string, enum: [suspected, probable, confirmed, ruled_out], default: suspected }
+                source: { type: string, enum: [facility, field_worker, citizen], default: facility }
+                ageGroup: { type: string, enum: ['0-4', '5-14', '15-49', '50+', unknown] }
+                sex: { type: string, enum: [M, F, unknown] }
+                onsetDate: { type: string, format: date }
+                notes: { type: string, maxLength: 1000 }
+                facilityId: { type: string, format: uuid }
+      responses:
+        '201': { description: Created DiseaseCase }
+        '400': { description: Invalid body, unresolvable place, or unknown diseaseCode (FK violation) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Health Cases]
+      summary: List within a geo scope
+      description: 'x-permission: `health.case.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: diseaseCode, schema: { type: string } }
+        - { in: query, name: caseStatus, schema: { type: string } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+      responses:
+        '200': { description: 'count + data: DiseaseCase[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /health-cases/{id}:
+    get:
+      tags: [Health Cases]
+      summary: Detail
+      description: 'x-permission: `health.case.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: DiseaseCase }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  # ── Safety Check-ins ──────────────────────────────────────────────────────
+  /safety-checkins:
+    post:
+      tags: [Safety Check-ins]
+      summary: "\"I'm Safe\" check-in — self or on behalf of someone else"
+      description: 'x-permission: `safety.checkin.create` (geo-scoped). Auto-links to the most recent open hazard event covering the place.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                status: { type: string, enum: [safe, need_help, injured] }
+                subjectName: { type: string, minLength: 2, maxLength: 200 }
+                notes: { type: string, maxLength: 500 }
+      responses:
+        '201': { description: Created SafetyCheckin }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Safety Check-ins]
+      summary: List within a geo scope
+      description: 'x-permission: `safety.checkin.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: status, schema: { type: string } }
+      responses:
+        '200': { description: 'count + data: SafetyCheckin[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /safety-checkins/event/{eventId}/summary:
+    get:
+      tags: [Safety Check-ins]
+      summary: Aggregated safe/need_help/injured counts for a hazard event
+      description: 'x-permission: `safety.checkin.read` (geo-scoped to the event''s place)'
+      parameters: [{ in: path, name: eventId, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: 'Aggregated summary counts' } }
+
+  /safety-checkins/event/{eventId}:
+    get:
+      tags: [Safety Check-ins]
+      summary: Check-ins for a hazard event
+      description: 'x-permission: `safety.checkin.read` (geo-scoped)'
+      parameters: [{ in: path, name: eventId, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: 'count + data: SafetyCheckin[]' } }
+
+  # ── SOS ───────────────────────────────────────────────────────────────────
+  /sos:
+    post:
+      tags: [SOS]
+      summary: Raise an SOS / panic-button alert
+      description: >
+        x-permission: `sos.create` (**national-scope** — every account holds a national grant,
+        so this is never geo-blocked). Immediately SMS + in-app notifies every eligible
+        responder covering the place, and (if Module M is wired) auto-creates a critical
+        dispatch task.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lng, lat]
+              properties: { lng: { type: number }, lat: { type: number }, dangerType: { type: string }, notes: { type: string, maxLength: 500 } }
+      responses:
+        '201': { description: Created SosAlert }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    get:
+      tags: [SOS]
+      summary: Active (open/acknowledged) SOS alerts within a geo scope
+      description: 'x-permission: `sos.read` (geo-scoped, `scope` required)'
+      parameters: [{ in: query, name: scope, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 'count + data: SosAlert[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /sos/{id}:
+    get:
+      tags: [SOS]
+      summary: Detail
+      description: 'x-permission: `sos.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: SosAlert }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  /sos/{id}/acknowledge:
+    post:
+      tags: [SOS]
+      summary: Acknowledge
+      description: 'x-permission: `sos.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Updated SosAlert }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  /sos/{id}/resolve:
+    post:
+      tags: [SOS]
+      summary: Resolve
+      description: 'x-permission: `sos.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [status], properties: { status: { type: string, enum: [resolved, false_alarm] } } } } }
+      responses:
+        '200': { description: Updated SosAlert }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Community Focal Points ────────────────────────────────────────────────
+  /community-focal-points:
+    post:
+      tags: [Community Focal Points]
+      summary: Register a community focal point
+      description: 'x-permission: `focal.create` (geo-scoped)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, relayMethod]
+              properties:
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                name: { type: string, minLength: 2, maxLength: 200 }
+                relayMethod: { type: string, enum: [door_to_door, gong_gong, loudhailer, radio_broadcast, notice_board] }
+                stationName: { type: string, maxLength: 200 }
+                contactPhone: { type: string }
+                contactEmail: { type: string, format: email }
+                notes: { type: string, maxLength: 500 }
+      responses:
+        '201': { description: Created CommunityFocalPoint }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Community Focal Points]
+      summary: List within a geo scope
+      description: 'x-permission: `focal.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: relayMethod, schema: { type: string } }
+        - { in: query, name: active, schema: { type: boolean } }
+      responses:
+        '200': { description: 'count + data: CommunityFocalPoint[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /community-focal-points/{id}:
+    get:
+      tags: [Community Focal Points]
+      summary: Detail
+      description: 'x-permission: `focal.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: CommunityFocalPoint }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Community Focal Points]
+      summary: Update
+      description: 'x-permission: `focal.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                relayMethod: { type: string, enum: [door_to_door, gong_gong, loudhailer, radio_broadcast, notice_board] }
+                stationName: { type: string }
+                contactPhone: { type: string }
+                contactEmail: { type: string }
+                notes: { type: string }
+                active: { type: boolean }
+      responses:
+        '200': { description: Updated CommunityFocalPoint }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Missing Persons ───────────────────────────────────────────────────────
+  /missing-persons:
+    post:
+      tags: [Missing Persons]
+      summary: Report a missing person
+      description: 'x-permission: `missing.report` (geo-scoped). Sensitive PII — no public route on this router.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, reporterPhone]
+              properties:
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                fullName: { type: string, minLength: 2, maxLength: 200 }
+                ageEstimate: { type: string, maxLength: 50 }
+                sex: { type: string, maxLength: 20 }
+                distinguishingFeatures: { type: string, maxLength: 2000 }
+                photoUrl: { type: string }
+                lastSeenAt: { type: string, format: date-time }
+                reporterPhone: { type: string }
+                relationshipToMissing: { type: string, maxLength: 100 }
+                notes: { type: string, maxLength: 2000 }
+      responses:
+        '201': { description: Created MissingPerson }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Missing Persons]
+      summary: List within a geo scope
+      description: 'x-permission: `missing.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: status, schema: { type: string } }
+      responses:
+        '200': { description: 'count + data: MissingPerson[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /missing-persons/{id}:
+    get:
+      tags: [Missing Persons]
+      summary: Detail
+      description: 'x-permission: `missing.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: MissingPerson }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Missing Persons]
+      summary: Update status or record a match/resolution
+      description: 'x-permission: `missing.manage` (geo-scoped). No forward-only state machine — any officer can move between all 4 statuses.'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [missing, found, reunified, closed] }
+                matchedCheckinId: { type: string, format: uuid, nullable: true }
+                matchedVulnerablePersonId: { type: string, format: uuid, nullable: true }
+                notes: { type: string, nullable: true }
+      responses:
+        '200': { description: Updated MissingPerson }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /missing-persons/{id}/matches:
+    get:
+      tags: [Missing Persons]
+      summary: Ranked candidate matches (pg_trgm fuzzy name similarity)
+      description: 'x-permission: `missing.read` (geo-scoped). Candidate discovery only — a human confirms via PATCH.'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: MissingPersonMatchResult
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { $ref: '#/components/schemas/MissingPersonMatchResult' } } }] } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Rumors ────────────────────────────────────────────────────────────────
+  /rumors:
+    post:
+      tags: [Rumors]
+      summary: Report a rumor for fact-checking
+      description: 'x-permission: `rumor.report` (geo-scoped if resolvable, else national — an unresolved place is still accepted, unlike most other create routes)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description]
+              properties:
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                hazardEventId: { type: string, format: uuid }
+                description: { type: string, minLength: 2, maxLength: 4000 }
+                source: { type: string, maxLength: 200 }
+                reporterPhone: { type: string }
+      responses:
+        '201': { description: Created RumorReport }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Rumors]
+      summary: List within a geo scope
+      description: 'x-permission: `rumor.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: status, schema: { type: string } }
+      responses:
+        '200': { description: 'count + data: RumorReport[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /rumors/{id}:
+    get:
+      tags: [Rumors]
+      summary: Detail
+      description: 'x-permission: `rumor.read` (geo-scoped; national for an unscoped rumor)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: RumorReport }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Rumors]
+      summary: Review a rumor
+      description: 'x-permission: `rumor.manage` (geo-scoped; national for an unscoped rumor)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties: { status: { type: string, enum: [reported, reviewing, confirmed_false, confirmed_true, clarified] }, resolutionNotes: { type: string, nullable: true } }
+      responses:
+        '200': { description: Updated RumorReport }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Myth-Fact (public feed) ───────────────────────────────────────────────
+  /myth-facts:
+    get:
+      tags: [Rumors]
+      summary: Public myth-vs-fact clarification feed
+      security: []
+      parameters:
+        - { in: query, name: scope, schema: { type: string, format: uuid } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 200 } }
+      responses:
+        '200': { description: 'count + data: MythFactEntry[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    post:
+      tags: [Rumors]
+      summary: Publish an official myth-vs-fact clarification
+      description: 'x-permission: `mythfact.publish` (geo-scoped if `placeId` given, else national). Fans out to community focal points.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [myth, fact]
+              properties:
+                myth: { type: string, minLength: 2, maxLength: 4000 }
+                fact: { type: string, minLength: 2, maxLength: 4000 }
+                hazardEventId: { type: string, format: uuid }
+                placeId: { type: string, format: uuid }
+                rumorReportId: { type: string, format: uuid }
+      responses:
+        '201': { description: Created MythFactEntry }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /myth-facts/{id}:
+    get:
+      tags: [Rumors]
+      summary: Public single clarification
+      security: []
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: MythFactEntry }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  # ── Anticipatory Action ───────────────────────────────────────────────────
+  /anticipatory/protocols:
+    post:
+      tags: [Anticipatory Action]
+      summary: Configure a forecast-based trigger protocol
+      description: 'x-permission: `anticipatory.manage` (geo-scoped to `placeId`)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, hazardType, placeId, triggerState, actions]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 200 }
+                hazardType: { type: string }
+                placeId: { type: string, format: uuid }
+                triggerState: { type: string, example: watch }
+                actions:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [type]
+                    properties: { type: { type: string, enum: [notify_focal_points, flag_vulnerable_evacuation, pre_position_relief] }, params: { type: object } }
+                active: { type: boolean }
+      responses:
+        '201': { description: Created AnticipatoryProtocol }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Anticipatory Action]
+      summary: List within a geo scope
+      description: 'x-permission: `anticipatory.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: hazardType, schema: { type: string } }
+        - { in: query, name: active, schema: { type: boolean } }
+      responses:
+        '200': { description: 'count + data: AnticipatoryProtocol[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /anticipatory/protocols/{id}:
+    get:
+      tags: [Anticipatory Action]
+      summary: Detail
+      description: 'x-permission: `anticipatory.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: AnticipatoryProtocol }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Anticipatory Action]
+      summary: Update
+      description: 'x-permission: `anticipatory.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                triggerState: { type: string }
+                actions: { type: array, items: { type: object } }
+                active: { type: boolean }
+      responses:
+        '200': { description: Updated AnticipatoryProtocol }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /anticipatory/activations:
+    get:
+      tags: [Anticipatory Action]
+      summary: Activation history within a geo scope
+      description: 'x-permission: `anticipatory.read` (geo-scoped, `scope` required)'
+      parameters: [{ in: query, name: scope, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: 'count + data: ProtocolActivation[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/ProtocolActivation' } } } }] } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # ── Evacuation ────────────────────────────────────────────────────────────
+  /evacuation/nearest-safe-place:
+    get:
+      tags: [Evacuation]
+      summary: Hazard-aware nearest safe shelter/facility suggestions
+      description: >
+        Honest scope: straight-line heading + hazard-aware ranking only, NOT road-network
+        routing (no Ghana road-network dataset or pgrouting extension exists).
+      security: []
+      parameters:
+        - { in: query, name: lng, required: true, schema: { type: number } }
+        - { in: query, name: lat, required: true, schema: { type: number } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 20, default: 5 } }
+      responses:
+        '200':
+          description: 'count + note + data: EvacuationSuggestion[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/EvacuationSuggestion' } } } }] } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # ── Common Operating Picture ──────────────────────────────────────────────
+  /hazards/events/{id}/cop:
+    get:
+      tags: [Common Operating Picture]
+      summary: One-call command-center aggregation for a hazard event
+      description: 'x-permission: `command.read` (geo-scoped to the event''s place)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: CopSnapshot
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { $ref: '#/components/schemas/CopSnapshot' } } }] } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /hazards/events/{id}/cop/roles:
+    post:
+      tags: [Common Operating Picture]
+      summary: Assign an ICS role for this event (auto-relieves any current holder)
+      description: 'x-permission: `command.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roleTitle, userId]
+              properties:
+                roleTitle: { type: string, enum: [incident_commander, operations, planning, logistics, finance_admin, safety_officer, liaison_officer, public_information_officer] }
+                userId: { type: string, format: uuid }
+      responses:
+        '201': { description: IcsRole }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /hazards/events/{id}/cop/roles/{roleId}:
+    delete:
+      tags: [Common Operating Picture]
+      summary: Relieve an ICS role assignment
+      description: 'x-permission: `command.manage` (geo-scoped to the event)'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: roleId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Relieved IcsRole (relieved_at set) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Shelters ──────────────────────────────────────────────────────────────
+  /shelters/nearest:
+    get:
+      tags: [Shelters]
+      summary: Nearest open shelters
+      security: []
+      parameters:
+        - { in: query, name: lng, required: true, schema: { type: number } }
+        - { in: query, name: lat, required: true, schema: { type: number } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 20, default: 5 } }
+      responses:
+        '200': { description: 'count + data: Shelter[] (each with a computed `meters` distance)' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /shelters:
+    post:
+      tags: [Shelters]
+      summary: Register a shelter
+      description: 'x-permission: `shelter.create` (geo-scoped)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                name: { type: string, minLength: 2, maxLength: 200 }
+                capacity: { type: integer, minimum: 0 }
+                facilities: { type: array, items: { type: string } }
+                contactPhone: { type: string }
+                managedBy: { type: string, format: uuid }
+                notes: { type: string, maxLength: 2000 }
+      responses:
+        '201': { description: Created Shelter }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Shelters]
+      summary: List within a geo scope
+      description: 'x-permission: `shelter.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: hasCapacity, schema: { type: boolean } }
+      responses:
+        '200': { description: 'count + data: Shelter[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /shelters/{id}:
+    get:
+      tags: [Shelters]
+      summary: Detail
+      description: 'x-permission: `shelter.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Shelter }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Shelters]
+      summary: Update
+      description: 'x-permission: `shelter.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                capacity: { type: integer, nullable: true }
+                status: { type: string, enum: [open, full, closed] }
+                contactPhone: { type: string, nullable: true }
+                notes: { type: string, nullable: true }
+                facilities: { type: array, items: { type: string } }
+      responses:
+        '200': { description: Updated Shelter }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /shelters/{id}/occupancy:
+    post:
+      tags: [Shelters]
+      summary: Adjust occupancy (check-in/out) — auto-transitions open⇄full
+      description: 'x-permission: `shelter.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [delta], properties: { delta: { type: integer, description: 'positive = check-in, negative = check-out' } } } } }
+      responses:
+        '200': { description: Updated Shelter }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Relief ────────────────────────────────────────────────────────────────
+  /relief:
+    post:
+      tags: [Relief]
+      summary: Record relief stock
+      description: 'x-permission: `relief.manage` (geo-scoped)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemType]
+              properties:
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                shelterId: { type: string, format: uuid }
+                itemType: { type: string, enum: [food, water, tents, medical_kits, blankets, other] }
+                quantity: { type: integer, minimum: 0 }
+                unit: { type: string }
+                lowStockThreshold: { type: integer, minimum: 0 }
+      responses:
+        '201': { description: Created ReliefStock }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Relief]
+      summary: List within a geo scope
+      description: 'x-permission: `relief.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: itemType, schema: { type: string } }
+        - { in: query, name: lowStockOnly, schema: { type: boolean } }
+      responses:
+        '200': { description: 'count + data: ReliefStock[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /relief/{id}:
+    get:
+      tags: [Relief]
+      summary: Detail
+      description: 'x-permission: `relief.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ReliefStock }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  /relief/{id}/adjust:
+    patch:
+      tags: [Relief]
+      summary: Adjust stock quantity
+      description: 'x-permission: `relief.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [delta], properties: { delta: { type: integer } } } } }
+      responses:
+        '200': { description: Updated ReliefStock }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /relief/{id}/distribute:
+    post:
+      tags: [Relief]
+      summary: Record a distribution (rejects if it would over-draw stock)
+      description: 'x-permission: `relief.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties: { quantity: { type: integer, minimum: 1 }, recipientDesc: { type: string, maxLength: 500 }, hazardEventId: { type: string, format: uuid } }
+      responses:
+        '201': { description: Created ReliefDistribution }
+        '400': { description: 'Invalid body or business-rule error (e.g. insufficient stock)' }
+        '404': { description: Stock record not found }
+
+  /relief/{id}/distributions:
+    get:
+      tags: [Relief]
+      summary: Distribution history for a stock record
+      description: 'x-permission: `relief.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: 'count + data: ReliefDistribution[]' } }
+
+  # ── Dispatch ──────────────────────────────────────────────────────────────
+  /dispatch:
+    post:
+      tags: [Dispatch]
+      summary: Create a dispatch task
+      description: 'x-permission: `dispatch.create` (geo-scoped if `placeId` given, else national)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskType]
+              properties:
+                hazardEventId: { type: string, format: uuid }
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                taskType: { type: string, enum: [rescue, assessment, distribution, repair, other] }
+                description: { type: string }
+                priority: { type: string, enum: [low, normal, high, critical] }
+      responses:
+        '201': { description: Created DispatchTask }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Dispatch]
+      summary: List within a geo scope
+      description: 'x-permission: `dispatch.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: taskType, schema: { type: string } }
+        - { in: query, name: hazardEventId, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: 'count + data: DispatchTask[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /dispatch/{id}:
+    get:
+      tags: [Dispatch]
+      summary: Detail
+      description: 'x-permission: `dispatch.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: DispatchTask }, '404': { description: 'Dispatch task not found' } }
+
+  /dispatch/{id}/events:
+    get:
+      tags: [Dispatch]
+      summary: Status-change history for a task
+      description: 'x-permission: `dispatch.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: 'count + data: DispatchTaskEvent[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/DispatchTaskEvent' } } } }] } } }
+
+  /dispatch/{id}/assign:
+    post:
+      tags: [Dispatch]
+      summary: Assign a task to a user
+      description: 'x-permission: `dispatch.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [assignedTo], properties: { assignedTo: { type: string, format: uuid } } } } }
+      responses:
+        '200': { description: Updated DispatchTask }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /dispatch/{id}/transition:
+    post:
+      tags: [Dispatch]
+      summary: Transition a task's status (open→assigned→in_progress→done, or cancelled)
+      description: 'x-permission: `dispatch.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [status], properties: { status: { type: string, enum: [open, assigned, in_progress, done, cancelled] }, note: { type: string } } }
+      responses:
+        '200': { description: Updated DispatchTask }
+        '400': { description: 'Invalid body or illegal transition' }
+
+  # ── Volunteers ────────────────────────────────────────────────────────────
+  /volunteers:
+    post:
+      tags: [Volunteers]
+      summary: Register a volunteer
+      description: 'x-permission: `volunteer.create` (geo-scoped)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                userId: { type: string, format: uuid }
+                name: { type: string, minLength: 2, maxLength: 200 }
+                phone: { type: string }
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                skills: { type: array, items: { type: string } }
+      responses:
+        '201': { description: Created Volunteer }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Volunteers]
+      summary: List within a geo scope
+      description: 'x-permission: `volunteer.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: availability, schema: { type: string } }
+        - { in: query, name: skill, schema: { type: string } }
+      responses:
+        '200': { description: 'count + data: Volunteer[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /volunteers/match:
+    get:
+      tags: [Volunteers]
+      summary: Match available volunteers to a dispatch task by place + skill
+      description: 'x-permission: `volunteer.read` (geo-scoped to the task''s place)'
+      parameters:
+        - { in: query, name: taskId, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: skill, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer } }
+      responses:
+        '200': { description: 'count + data: Volunteer[]' }
+        '400': { description: 'taskId missing' }
+        '404': { description: 'Task not found or has no resolvable place' }
+
+  /volunteers/{id}:
+    get:
+      tags: [Volunteers]
+      summary: Detail
+      description: 'x-permission: `volunteer.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Volunteer }, '404': { description: 'Volunteer not found' } }
+    patch:
+      tags: [Volunteers]
+      summary: Update
+      description: 'x-permission: `volunteer.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                phone: { type: string }
+                skills: { type: array, items: { type: string } }
+                availability: { type: string, enum: [available, unavailable, deployed] }
+      responses:
+        '200': { description: Updated Volunteer }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /volunteers/{id}/assign:
+    post:
+      tags: [Volunteers]
+      summary: Assign a volunteer to a task
+      description: 'x-permission: `volunteer.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [taskId], properties: { taskId: { type: string, format: uuid } } } } }
+      responses:
+        '200': { description: Updated Volunteer }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # ── Response Assets ───────────────────────────────────────────────────────
+  /response-assets:
+    post:
+      tags: [Response Assets]
+      summary: Register a response asset
+      description: 'x-permission: `asset.manage` (geo-scoped)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, assetType, placeId]
+              properties: { name: { type: string, minLength: 2, maxLength: 200 }, assetType: { type: string, enum: [vehicle, boat, equipment, other] }, placeId: { type: string, format: uuid }, notes: { type: string } }
+      responses:
+        '201': { description: Created ResponseAsset }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    get:
+      tags: [Response Assets]
+      summary: List within a geo scope
+      description: 'x-permission: `asset.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: assetType, schema: { type: string } }
+      responses:
+        '200': { description: 'count + data: ResponseAsset[]' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /response-assets/{id}:
+    get:
+      tags: [Response Assets]
+      summary: Detail
+      description: 'x-permission: `asset.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ResponseAsset }, '404': { description: 'Response asset not found' } }
+    patch:
+      tags: [Response Assets]
+      summary: Update
+      description: 'x-permission: `asset.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { name: { type: string }, assetType: { type: string, enum: [vehicle, boat, equipment, other] }, status: { type: string, enum: [available, deployed, maintenance] }, notes: { type: string } }
+      responses:
+        '200': { description: Updated ResponseAsset }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /response-assets/{id}/assign:
+    post:
+      tags: [Response Assets]
+      summary: Assign to a task
+      description: 'x-permission: `asset.manage` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [taskId], properties: { taskId: { type: string, format: uuid } } } } }
+      responses:
+        '200': { description: Updated ResponseAsset }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # ── Response Timeline ─────────────────────────────────────────────────────
+  /response-timeline/{hazardEventId}:
+    get:
+      tags: [Response Timeline]
+      summary: Merged after-action timeline for a hazard event
+      description: 'x-permission: `hazard.event.read` (geo-scoped to the event, reuses the hazard-event read permission)'
+      parameters: [{ in: path, name: hazardEventId, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: 'count + data: TimelineEntry[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/TimelineEntry' } } } }] } } }
+
+  # ── Admin ─────────────────────────────────────────────────────────────────
+  /admin/system-health:
+    get:
+      tags: [Admin]
+      summary: DB connectivity/latency, applied-migration count, scheduled-jobs flag, process uptime
+      description: 'x-permission: `config.manage` (national-scope, effectively super_admin only)'
+      responses:
+        '200': { description: System health object }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/integrations-status:
+    get:
+      tags: [Admin]
+      summary: 'configured:boolean + non-secret metadata per integration (Arkesel, Gemini, Gmail, WhatsApp, FIRMS, Copernicus, Google Maps, alert signing, Cloudinary)'
+      description: 'x-permission: `config.manage` (national-scope). Never returns secret values, and presence isn''t validity — a state check can''t confirm a token is still valid without making a real call.'
+      responses:
+        '200': { description: Integration status map }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ── Admin Users ───────────────────────────────────────────────────────────
+  /admin/users:
+    get:
+      tags: [Admin Users]
+      summary: List/search user accounts
+      description: 'x-permission: `user.manage` (national-scope)'
+      parameters:
+        - { in: query, name: status, schema: { type: string, enum: [active, suspended] } }
+        - { in: query, name: search, schema: { type: string } }
+      responses:
+        '200':
+          description: 'count + data: AdminUser[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/AdminUser' } } } }] } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/users/{id}:
+    get:
+      tags: [Admin Users]
+      summary: Detail (includes current role grants)
+      description: 'x-permission: `user.manage` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: AdminUser }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  /admin/users/{id}/status:
+    patch:
+      tags: [Admin Users]
+      summary: Suspend/reactivate a user account
+      description: 'x-permission: `user.manage` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [status], properties: { status: { type: string, enum: [active, suspended] } } } } }
+      responses:
+        '200': { description: Updated AdminUser }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/users/{id}/roles:
+    get:
+      tags: [Admin Users]
+      summary: List a user's role grants
+      description: 'x-permission: `user.manage` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: 'count + data: RoleGrant[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/RoleGrant' } } } }] } } }
+    post:
+      tags: [Admin Users]
+      summary: Grant a role (geography-scoped or national)
+      description: 'x-permission: `role.assign` (national-scope). Idempotent on an exact repeat grant.'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [roleCode], properties: { roleCode: { type: string }, placeId: { type: string, format: uuid, nullable: true } } }
+      responses:
+        '201': { description: RoleGrant (existing or newly created) }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /admin/users/{id}/roles/{roleGrantId}:
+    delete:
+      tags: [Admin Users]
+      summary: Revoke a role grant
+      description: 'x-permission: `role.assign` (national-scope)'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: roleGrantId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Deleted RoleGrant }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Admin Organizations ───────────────────────────────────────────────────
+  /admin/organizations:
+    get:
+      tags: [Admin Organizations]
+      summary: List/search organizations
+      description: 'x-permission: `org.manage` (national-scope)'
+      parameters:
+        - { in: query, name: type, schema: { type: string } }
+        - { in: query, name: verified, schema: { type: boolean } }
+        - { in: query, name: search, schema: { type: string } }
+      responses:
+        '200':
+          description: 'count + data: Organization[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/Organization' } } } }] } } }
+    post:
+      tags: [Admin Organizations]
+      summary: Create an organization
+      description: 'x-permission: `org.manage` (national-scope)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 200 }
+                type: { type: string, enum: [ngo, government_agency, assembly, research, media, other] }
+                contact: { type: object }
+                metadata: { type: object }
+      responses:
+        '201': { description: Created Organization }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /admin/organizations/{id}:
+    get:
+      tags: [Admin Organizations]
+      summary: Detail
+      description: 'x-permission: `org.manage` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Organization }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Admin Organizations]
+      summary: Update
+      description: 'x-permission: `org.manage` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { name: { type: string }, type: { type: string }, contact: { type: object }, metadata: { type: object } }
+      responses:
+        '200': { description: Updated Organization }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /admin/organizations/{id}/members:
+    get:
+      tags: [Admin Organizations]
+      summary: List an organization's member users
+      description: 'x-permission: `org.manage` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 'count + data: [{ id, name, email, phone, status }]' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/organizations/{id}/verify:
+    post:
+      tags: [Admin Organizations]
+      summary: Set an organization's verified flag
+      description: 'x-permission: `org.manage` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [verified], properties: { verified: { type: boolean } } } } }
+      responses:
+        '200': { description: Updated Organization }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # ── Assessments ───────────────────────────────────────────────────────────
+  /assessments:
+    post:
+      tags: [Assessments]
+      summary: Submit a rapid damage & needs assessment
+      description: 'x-permission: `assessment.create` (geo-scoped)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                placeId: { type: string, format: uuid }
+                lng: { type: number }
+                lat: { type: number }
+                hazardEventId: { type: string, format: uuid }
+                householdsAffected: { type: integer, minimum: 0, default: 0 }
+                personsAffected: { type: integer, minimum: 0, default: 0 }
+                casualties: { type: integer, minimum: 0, default: 0 }
+                injuries: { type: integer, minimum: 0, default: 0 }
+                infrastructureDamage: { type: string, maxLength: 4000 }
+                urgentNeeds: { type: array, items: { type: string } }
+                notes: { type: string, maxLength: 4000 }
+      responses:
+        '201': { description: Created DamageAssessment }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Assessments]
+      summary: List within a geo scope
+      description: 'x-permission: `assessment.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: hazardEventId, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: 'count + data: DamageAssessment[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/DamageAssessment' } } } }] } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /assessments/sitrep:
+    get:
+      tags: [Assessments]
+      summary: Rolled-up situation report for a geo scope (optionally scoped to one hazard event)
+      description: 'x-permission: `assessment.read` (geo-scoped, `scope` required)'
+      parameters:
+        - { in: query, name: scope, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: hazardEventId, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: SituationReport (single object, no `count`)
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { $ref: '#/components/schemas/SituationReport' } } }] } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /assessments/{id}:
+    get:
+      tags: [Assessments]
+      summary: Detail
+      description: 'x-permission: `assessment.read` (geo-scoped)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: DamageAssessment }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  # ── Analytics ─────────────────────────────────────────────────────────────
+  /analytics/executive-summary:
+    get:
+      tags: [Analytics]
+      summary: Cross-module executive dashboard for a geo scope
+      description: 'x-permission: `analytics.read` (geo-scoped, `scope` required — no national "everyone" query)'
+      parameters: [{ in: query, name: scope, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: ExecutiveSummary
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { $ref: '#/components/schemas/ExecutiveSummary' } } }] } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /analytics/trends:
+    get:
+      tags: [Analytics]
+      summary: Monthly hazard-event trend chart, geo-scoped or national
+      description: 'x-permission: `analytics.read`. Omitting `scope` requires an unscoped (national-level) grant.'
+      parameters:
+        - { in: query, name: months, schema: { type: integer, minimum: 1, maximum: 36, default: 12 } }
+        - { in: query, name: scope, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: 'count + data: MonthlyHazardTrend[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/MonthlyHazardTrend' } } } }] } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ── Badges ────────────────────────────────────────────────────────────────
+  /badges:
+    get:
+      tags: [Badges]
+      summary: The badge catalog (public — what's earnable and how)
+      security: []
+      responses:
+        '200':
+          description: 'count + data: Badge[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/Badge' } } } }] } } }
+
+  /badges/leaderboard:
+    get:
+      tags: [Badges]
+      summary: Top reporters by verified-report count (public — recognition is meant to be visible)
+      security: []
+      parameters:
+        - { in: query, name: scope, schema: { type: string, format: uuid } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: 'count + data: LeaderboardEntry[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/LeaderboardEntry' } } } }] } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /badges/me:
+    get:
+      tags: [Badges]
+      summary: The caller's own earned badges
+      responses:
+        '200':
+          description: 'count + data: UserBadge[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/UserBadge' } } } }] } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Data Hub ──────────────────────────────────────────────────────────────
+  /datahub/datasets:
+    get:
+      tags: [Data Hub]
+      summary: Browse the dataset catalog
+      description: >
+        Works logged-out (optionalAuth). Visibility is enforced in-service, not by RBAC
+        middleware: callers without `data.dataset.read` (including anonymous) only ever
+        see `status=published AND sharing_mode=public` rows.
+      security: []
+      parameters:
+        - { in: query, name: category, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: sharingMode, schema: { type: string, enum: [public, by_request, private] } }
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: placeId, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: 'count + data: Dataset[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/Dataset' } } } }] } } }
+    post:
+      tags: [Data Hub]
+      summary: Create a dataset (starts as draft)
+      description: 'x-permission: `data.publish` (national-scope)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, format]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 200 }
+                description: { type: string, maxLength: 4000 }
+                category: { type: string, maxLength: 100 }
+                placeId: { type: string, format: uuid }
+                timeRangeStart: { type: string, format: date }
+                timeRangeEnd: { type: string, format: date }
+                format: { type: string, enum: [csv, geojson, excel, pdf, json] }
+                fileUrl: { type: string, format: uri }
+                fileSizeBytes: { type: integer, minimum: 0 }
+                rowCount: { type: integer, minimum: 0 }
+                license: { type: string, enum: [cc_by, cc_by_sa, cc0, open_data, restricted, proprietary], default: restricted }
+                attribution: { type: string, maxLength: 500 }
+                sharingMode: { type: string, enum: [public, by_request, private], default: private }
+                containsPii: { type: boolean, default: false, description: 'Cannot be true together with sharingMode=public — 400 if so.' }
+      responses:
+        '201': { description: Created Dataset }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /datahub/datasets/{id}:
+    get:
+      tags: [Data Hub]
+      summary: Dataset detail (same visibility rule as the catalog list)
+      security: []
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Dataset }, '404': { $ref: '#/components/responses/NotFound' } }
+    patch:
+      tags: [Data Hub]
+      summary: Update dataset metadata
+      description: 'x-permission: `data.publish` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: All fields from POST /datasets, all optional (partial update).
+      responses:
+        '200': { description: Updated Dataset }
+        '400': { description: 'Invalid body, or the PII/public guard rejects the effective post-patch state' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /datahub/datasets/{id}/download:
+    get:
+      tags: [Data Hub]
+      summary: Download (or get the file URL for) a dataset, per its sharing mode
+      description: >
+        Public+published datasets need zero auth. `by_request`/`private` need either a
+        Bearer JWT (with an approved request, or matching org, or `data.publish`) or a
+        valid `X-API-Key`. Every successful call is logged for usage analytics.
+      security: [{ bearerAuth: [] }, { apiKeyAuth: [] }, {}]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: '{ fileUrl, format } — not the full Dataset object' }
+        '401': { description: Invalid or revoked API key }
+        '403': { description: 'Not published, or no access — request access first' }
+        '404': { description: 'Dataset not found, or has no file attached yet' }
+
+  /datahub/datasets/{id}/submit-for-review:
+    post:
+      tags: [Data Hub]
+      summary: Submit a draft (or rejected) dataset for QA review
+      description: 'x-permission: `data.publish` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Dataset now pending_review }
+        '400': { description: 'Not found, or not in draft/rejected state' }
+
+  /datahub/datasets/{id}/review:
+    post:
+      tags: [Data Hub]
+      summary: QA decision — publish or reject
+      description: 'x-permission: `data.publish` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [decision], properties: { decision: { type: string, enum: [published, rejected] } } } } }
+      responses:
+        '200': { description: Updated Dataset }
+        '400': { description: 'Invalid body, or not pending_review' }
+
+  /datahub/datasets/{id}/archive:
+    post:
+      tags: [Data Hub]
+      summary: Archive a dataset
+      description: 'x-permission: `data.publish` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Dataset now archived }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  /datahub/datasets/{id}/usage:
+    get:
+      tags: [Data Hub]
+      summary: Download/request usage analytics for a dataset
+      description: 'x-permission: `data.publish` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: DatasetUsageStats
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { $ref: '#/components/schemas/DatasetUsageStats' } } }] } } }
+
+  /datahub/datasets/{id}/requests:
+    post:
+      tags: [Data Hub]
+      summary: Request access to a by_request dataset
+      description: 'x-permission: `data.request.create` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [justification], properties: { justification: { type: string, minLength: 10, maxLength: 2000 } } } } }
+      responses:
+        '201': { description: Created DataRequest (status pending) }
+        '400': { description: 'Invalid body, dataset not published, or not by_request mode' }
+    get:
+      tags: [Data Hub]
+      summary: List requests for a dataset (owner/admin view)
+      description: 'x-permission: `data.request.approve` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: 'count + data: DataRequest[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/DataRequest' } } } }] } } }
+
+  /datahub/my-requests:
+    get:
+      tags: [Data Hub]
+      summary: The caller's own data requests, across all datasets
+      responses:
+        '200':
+          description: 'count + data: DataRequest[]'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/DataRequest' } } } }] } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /datahub/requests/{id}/review:
+    post:
+      tags: [Data Hub]
+      summary: Approve or deny a data request
+      description: 'x-permission: `data.request.approve` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [decision], properties: { decision: { type: string, enum: [approved, denied] }, notes: { type: string, maxLength: 1000 } } }
+      responses:
+        '200': { description: Updated DataRequest }
+        '404': { description: 'Not found or not pending' }
+
+  /datahub/api-keys:
+    post:
+      tags: [Data Hub]
+      summary: Create an org-scoped Public-Data-API key
+      description: 'x-permission: `data.publish` (national-scope). The raw key is returned exactly once, here.'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string, minLength: 2, maxLength: 200 } } } } }
+      responses:
+        '201':
+          description: ApiKeyCreated (includes rawKey — shown once, never again)
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { $ref: '#/components/schemas/ApiKeyCreated' } } }] } } }
+        '400': { description: 'Missing name, or the caller has no organization' }
+    get:
+      tags: [Data Hub]
+      summary: List the caller's org's API keys
+      description: 'x-permission: `data.publish` (national-scope)'
+      responses:
+        '200':
+          description: 'count + data: ApiKey[] (no rawKey field on reads)'
+          content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/Envelope' }, { properties: { data: { type: array, items: { $ref: '#/components/schemas/ApiKey' } } } }] } } }
+
+  /datahub/api-keys/{id}:
+    delete:
+      tags: [Data Hub]
+      summary: Revoke an API key
+      description: 'x-permission: `data.publish` (national-scope)'
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Revoked ApiKey }
+        '404': { description: 'Not found or already revoked' }
