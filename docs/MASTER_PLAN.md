@@ -242,18 +242,49 @@ From "emergency broadcast feed" to a real geo-targeted, multi-channel alerting s
 - ✅ **AI-generated alert copy** — Gemini writes plain-language, localized warning text (exists for broadcasts).
 - 🆕 **Delivery tracking** — sent/delivered/read metrics per broadcast.
 
-### Module G — Data Hub (open + request-gated exchange) 🆕 (major new pillar)
+### Module G — Data Hub (open + request-gated exchange) ✅ (2026-07-10, first Phase 3 pillar)
 The HDX-style data-sharing platform — our path to national relevance & sustainability.
+Built on explicit user request after the Phase 1/2 backend was declared complete — a
+deliberate, confirmed move into Phase 3 (see §11), not scope drift.
 
-- 🆕 **Dataset catalog** — browsable, searchable datasets (by hazard, location, time range, format, license, source) with rich metadata.
-- 🆕 **Three sharing modes** (HDX model): **Public** (open download), **By-request** (approval workflow), **Private** (org-internal).
-- 🆕 **Data request workflow** — an NGO/researcher requests a gated dataset → owner/admin approves/denies → access granted with terms. Full audit trail.
-- 🆕 **Export formats** — CSV, GeoJSON, Excel, PDF reports; scheduled/one-off.
-- 🆕 **Public Data API** — documented REST API + API keys so partners can pull data programmatically (e.g. "flood patterns for Region X, 2015–2025").
-- 🆕 **Licensing & attribution** — each dataset carries a license (open/CC, restricted) and required attribution.
-- 🆕 **Privacy & anonymization** — automatic PII stripping / aggregation for public tiers (citizens' personal data never leaks).
-- 🆕 **Dataset QA/curation** — admin review before a dataset goes public (metadata completeness, integrity), mirroring HDX's manual QA.
-- 🆕 **Usage analytics** — who downloaded/requested what; demonstrates impact to funders/government.
+- ✅ **Dataset catalog** — `GET /api/v1/datahub/datasets?category=&status=&sharingMode=&search=&placeId=`,
+  browsable/searchable by hazard category, geo scope, format, license, sharing mode.
+  Visibility itself is access-controlled: an unauthenticated or `data.dataset.read`-less
+  caller only ever sees `published`+`public` rows.
+- ✅ **Three sharing modes** (HDX model) — `public` (open download, zero auth),
+  `by_request` (approval workflow below), `private` (same-org or `data.publish` only).
+- ✅ **Data request workflow** — `POST /datasets/:id/requests` → `POST
+  /requests/:id/review` (approve/deny + notes) → download unlocks only once approved.
+  Full audit trail via the existing `AuditRecorder`.
+- 🔁 **Export formats** — a dataset is served exactly as uploaded (CSV/GeoJSON/Excel/
+  PDF/JSON); **no automatic format conversion** is built (documented scope limit, not
+  a gap missed).
+- ✅ **Public Data API** — `X-API-Key` header accepted as an alternative to a JWT on
+  the download route; keys are org-scoped, shown once at creation (only a sha256 hash
+  + display prefix persisted), revocable, and stamp `last_used_at`.
+- ✅ **Licensing & attribution** — `license`/`attribution` fields on every dataset,
+  surfaced in every catalog/detail response.
+- 🔁 **Privacy & anonymization** — **no automatic PII stripping of file contents** (no
+  reliable way to redact arbitrary uploaded files). Instead: a declared `contains_pii`
+  curator flag, backed by a **DB `CHECK` constraint** (defense in depth, not just an
+  app-layer check) forbidding `sharing_mode = 'public' AND contains_pii`, plus a
+  service-layer guard giving a clean `400` instead of a raw constraint-violation `500`.
+- ✅ **Dataset QA/curation** — `draft → pending_review → published/rejected` via
+  `submit-for-review` + `review`, gated by `data.publish` — admin sign-off before a
+  dataset is ever public, mirroring HDX's manual QA.
+- ✅ **Usage analytics** — `GET /datasets/:id/usage`: total/unique downloads +
+  request counts by status.
+
+Reuses `data.dataset.read`/`data.request.create`/`data.request.approve`/`data.publish`
+— seeded since Phase 0/1 with correct per-role grants already in place (national_agency:
+full curator; district_officer: read-only; researcher/ngo_partner: read+request) —
+zero RBAC changes needed. `datasets`/`data_requests`/`data_api_keys`/`dataset_downloads`
+(migration 0024). Live-verified end-to-end on the real Neon dev branch: draft hidden
+from the public catalog, QA review flow to published, public download with zero auth,
+by-request dataset correctly 403s until a real approved request exists (tested with a
+real registered `researcher`-role user, not a stub), usage stats reflect the real
+download, an API key downloads successfully and correctly 401s once invalid/revoked,
+and the public+PII guard rejects with a clean 400. All test data cleaned up.
 
 ### Module H — Maps & Geospatial Intelligence 🔁
 - ✅ **Map explorer** — Leaflet + GeoJSON layers (toilets, facilities, flood zones, vulnerability) — legacy, sanitation-scoped.
